@@ -1,43 +1,9 @@
 let segmenter: Intl.Segmenter | null = null
-let initPromise: Promise<void> | null = null
-let initError: Error | null = null
-
-function initializePolyfill(): Promise<void> {
-  if (initPromise) return initPromise
-
-  initPromise = (async () => {
-    if (typeof Intl === "undefined" || typeof (Intl as any).Segmenter !== "function") {
-      try {
-        await import("@formatjs/intl-segmenter/polyfill-force.js")
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        initError = new Error(
-          `Failed to load Intl.Segmenter polyfill: ${message}. Please ensure @formatjs/intl-segmenter is installed or use a runtime that supports Intl.Segmenter natively.`,
-        )
-      }
-    }
-  })()
-
-  return initPromise
-}
-
-initializePolyfill()
 
 export function getGraphemeSegmenter(): Intl.Segmenter {
   if (segmenter) return segmenter
-
-  if (typeof Intl !== "undefined" && typeof (Intl as any).Segmenter === "function") {
-    segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" })
-    return segmenter
-  }
-
-  if (initError) {
-    throw initError
-  }
-
-  throw new Error(
-    "Intl.Segmenter is not available. Please ensure your runtime supports it or install @formatjs/intl-segmenter",
-  )
+  segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" })
+  return segmenter
 }
 
 function isHighSurrogate(code: number): boolean {
