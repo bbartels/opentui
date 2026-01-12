@@ -54,6 +54,7 @@ export class KeyEvent implements ParsedKey {
   repeated?: boolean
 
   private _defaultPrevented: boolean = false
+  private _propagationStopped: boolean = false
 
   constructor(key: ParsedKey) {
     this.name = key.name
@@ -78,14 +79,24 @@ export class KeyEvent implements ParsedKey {
   get defaultPrevented(): boolean {
     return this._defaultPrevented
   }
+
+  get propagationStopped(): boolean {
+    return this._propagationStopped
+  }
+
   preventDefault(): void {
     this._defaultPrevented = true
+  }
+
+  stopPropagation(): void {
+    this._propagationStopped = true
   }
 }
 
 export class PasteEvent {
   text: string
   private _defaultPrevented: boolean = false
+  private _propagationStopped: boolean = false
 
   constructor(text: string) {
     this.text = text
@@ -95,8 +106,16 @@ export class PasteEvent {
     return this._defaultPrevented
   }
 
+  get propagationStopped(): boolean {
+    return this._propagationStopped
+  }
+
   preventDefault(): void {
     this._defaultPrevented = true
+  }
+
+  stopPropagation(): void {
+    this._propagationStopped = true
   }
 }
 
@@ -288,10 +307,28 @@ export class InternalKeyHandler extends KeyHandler {
   private emitWithPriority<K extends keyof KeyHandlerEventMap>(event: K, ...args: KeyHandlerEventMap[K]): boolean {
     let hasGlobalListeners = false
 
-    try {
-      hasGlobalListeners = super.emit(event as any, ...args)
-    } catch (error) {
-      console.error(`[KeyHandler] Error in global ${event} handler:`, error)
+    // Check if we should emit to global handlers
+    // Global handlers are emitted using the parent EventEmitter which calls all listeners
+    // We need to manually iterate to check for stopPropagation between handlers
+    const globalListeners = this.listeners(event as any)
+    if (globalListeners.length > 0) {
+      hasGlobalListeners = true
+
+      for (const listener of globalListeners) {
+        try {
+          listener(...args)
+        } catch (error) {
+          console.error(`[KeyHandler] Error in global ${event} handler:`, error)
+        }
+
+        // Check if propagation was stopped after this handler
+        if (event === "keypress" || event === "keyrelease" || event === "paste") {
+          const keyEvent = args[0]
+          if (keyEvent.propagationStopped) {
+            return hasGlobalListeners
+          }
+        }
+      }
     }
 
     const renderableSet = this.renderableHandlers.get(event)
@@ -304,6 +341,7 @@ export class InternalKeyHandler extends KeyHandler {
       if (event === "keypress" || event === "keyrelease" || event === "paste") {
         const keyEvent = args[0]
         if (keyEvent.defaultPrevented) return hasGlobalListeners || hasRenderableListeners
+        if (keyEvent.propagationStopped) return hasGlobalListeners || hasRenderableListeners
       }
 
       for (const handler of renderableHandlers) {
@@ -311,6 +349,14 @@ export class InternalKeyHandler extends KeyHandler {
           handler(...args)
         } catch (error) {
           console.error(`[KeyHandler] Error in renderable ${event} handler:`, error)
+        }
+
+        // Check if propagation was stopped after this handler
+        if (event === "keypress" || event === "keyrelease" || event === "paste") {
+          const keyEvent = args[0]
+          if (keyEvent.propagationStopped) {
+            return hasGlobalListeners || hasRenderableListeners
+          }
         }
       }
     }
