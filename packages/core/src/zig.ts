@@ -18,6 +18,7 @@ import {
   LineInfoStruct,
   MeasureResultStruct,
   CursorStateStruct,
+  OutputBufferPtrsStruct,
 } from "./zig-structs"
 import { isBunfsPath } from "./lib/bunfs"
 import { attributesWithLink } from "./utils"
@@ -94,7 +95,7 @@ function getOpenTUILib(libPath?: string) {
     },
     // Renderer management
     createRenderer: {
-      args: ["u32", "u32", "bool", "bool"],
+      args: ["u32", "u32", "bool", "u8", "bool"],
       returns: "ptr",
     },
     destroyRenderer: {
@@ -1013,6 +1014,24 @@ function getOpenTUILib(libPath?: string) {
       args: ["ptr", "u32", "u32", "u32", "ptr", "ptr", "u32"],
       returns: "void",
     },
+
+    // Stream-agnostic renderer API
+    setFlushCallback: {
+      args: ["ptr"],
+      returns: "void",
+    },
+    getOutputBufferPtrs: {
+      args: ["ptr", "ptr"],
+      returns: "void",
+    },
+    setWriteReady: {
+      args: ["ptr", "bool"],
+      returns: "void",
+    },
+    getOutputBufferCapacity: {
+      args: [],
+      returns: "usize",
+    },
   })
 
   if (env.OTUI_DEBUG_FFI || env.OTUI_TRACE_FFI) {
@@ -1267,7 +1286,11 @@ export interface CursorState {
 }
 
 export interface RenderLib {
-  createRenderer: (width: number, height: number, options?: { testing?: boolean; remote?: boolean }) => Pointer | null
+  createRenderer: (
+    width: number,
+    height: number,
+    options?: { testing?: boolean; outputStrategy?: number; remote?: boolean },
+  ) => Pointer | null
   destroyRenderer: (renderer: Pointer) => void
   setUseThread: (renderer: Pointer, useThread: boolean) => void
   setBackgroundColor: (renderer: Pointer, color: RGBA) => void
@@ -1679,6 +1702,14 @@ export interface RenderLib {
   getTerminalCapabilities: (renderer: Pointer) => any
   processCapabilityResponse: (renderer: Pointer, response: string) => void
 
+  // Stream-agnostic renderer API
+  getOutputBufferPtrs: (renderer: Pointer) => { bufferA: Pointer; bufferB: Pointer; capacity: bigint }
+  setWriteReady: (renderer: Pointer, ready: boolean) => void
+  getOutputBufferCapacity: () => number
+  registerFlushCallback: (
+    callback: (rendererPtr: Pointer, bufferIndex: number, bufferLen: bigint | number) => void,
+  ) => void
+
   encodeUnicode: (
     text: string,
     widthMethod: WidthMethod,
@@ -1820,10 +1851,15 @@ class FFIRenderLib implements RenderLib {
     this.opentui.symbols.setEventCallback(callbackPtr)
   }
 
-  public createRenderer(width: number, height: number, options: { testing?: boolean; remote?: boolean } = {}) {
+  public createRenderer(
+    width: number,
+    height: number,
+    options: { testing?: boolean; outputStrategy?: number; remote?: boolean } = {},
+  ) {
     const testing = options.testing ?? false
+    const strategy = options.outputStrategy ?? 0 // 0 = stdout (default), 1 = callback
     const remote = options.remote ?? false
-    return this.opentui.symbols.createRenderer(width, height, testing, remote)
+    return this.opentui.symbols.createRenderer(width, height, testing, strategy, remote)
   }
 
   public destroyRenderer(renderer: Pointer): void {
@@ -3503,6 +3539,59 @@ class FFIRenderLib implements RenderLib {
 
   public onAnyNativeEvent(handler: (name: string, data: ArrayBuffer) => void): void {
     this._anyEventHandlers.push(handler)
+  }
+
+  // Stream-agnostic renderer API
+  private flushCallbackWrapper: any = null
+
+  public getOutputBufferPtrs(renderer: Pointer): { bufferA: Pointer; bufferB: Pointer; capacity: bigint } {
+    const buffer = new ArrayBuffer(OutputBufferPtrsStruct.size)
+    this.opentui.symbols.getOutputBufferPtrs(renderer, ptr(buffer))
+    const result = OutputBufferPtrsStruct.unpack(buffer)
+    return {
+      bufferA: result.bufferA as unknown as Pointer,
+      bufferB: result.bufferB as unknown as Pointer,
+      capacity: BigInt(result.capacity),
+    }
+  }
+
+  public setWriteReady(renderer: Pointer, ready: boolean): void {
+    this.opentui.symbols.setWriteReady(renderer, ready)
+  }
+
+  public getOutputBufferCapacity(): number {
+    const result = this.opentui.symbols.getOutputBufferCapacity()
+    return typeof result === "bigint" ? Number(result) : result
+  }
+
+  public registerFlushCallback(
+    callback: (rendererPtr: Pointer, bufferIndex: number, bufferLen: bigint | number) => void,
+  ): void {
+    if (this.flushCallbackWrapper) {
+      return // Already registered
+    }
+
+    const flushCallback = new JSCallback(
+      (rendererPtr: Pointer, bufferIndex: number, bufferPtr: Pointer, bufferLenBigInt: bigint | number) => {
+        try {
+          callback(rendererPtr, bufferIndex, bufferLenBigInt)
+        } catch (error) {
+          console.error("Error in flush callback:", error)
+        }
+      },
+      {
+        args: ["ptr", "u8", "ptr", "usize"],
+        returns: "void",
+      },
+    )
+
+    this.flushCallbackWrapper = flushCallback
+
+    if (!flushCallback.ptr) {
+      throw new Error("Failed to create flush callback")
+    }
+
+    this.opentui.symbols.setFlushCallback(flushCallback.ptr)
   }
 }
 

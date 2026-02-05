@@ -23,7 +23,7 @@ test "renderer - create and destroy" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -49,7 +49,7 @@ test "renderer - simple text rendering to currentRenderBuffer" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -90,7 +90,7 @@ test "renderer - multi-line text rendering" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -130,7 +130,7 @@ test "renderer - emoji (wide grapheme) rendering" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -186,7 +186,7 @@ test "renderer - CJK characters rendering" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -238,7 +238,7 @@ test "renderer - mixed ASCII, emoji, and CJK" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -286,7 +286,7 @@ test "renderer - resize updates dimensions" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -308,7 +308,7 @@ test "renderer - background color setting" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -335,7 +335,7 @@ test "renderer - empty text buffer renders correctly" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -359,7 +359,7 @@ test "renderer - multiple renders update currentRenderBuffer" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -403,7 +403,7 @@ test "renderer - 1000 frame render loop with setStyledText" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -487,7 +487,7 @@ test "renderer - grapheme pool refcounting with frame buffer fast path" {
         80,
         24,
         limited_pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -556,7 +556,7 @@ test "renderer - hyperlinks enabled with OSC 8 output" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -603,7 +603,7 @@ test "renderer - hyperlinks disabled no OSC 8 output" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -640,7 +640,7 @@ test "renderer - link transition mid-line" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -706,7 +706,7 @@ test "renderer - explicit_cursor_positioning emits cursor move after wide graphe
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -739,7 +739,7 @@ test "renderer - explicit_cursor_positioning produces more cursor moves" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer1.destroy();
 
@@ -756,7 +756,7 @@ test "renderer - explicit_cursor_positioning produces more cursor moves" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer2.destroy();
 
@@ -813,7 +813,7 @@ test "renderer - explicit_cursor_positioning with CJK characters" {
         80,
         24,
         pool,
-        true,
+        .{ .testing = true },
     );
     defer cli_renderer.destroy();
 
@@ -828,4 +828,212 @@ test "renderer - explicit_cursor_positioning with CJK characters" {
     const output = cli_renderer.getLastOutputForTest();
 
     try std.testing.expect(std.mem.indexOf(u8, output, "\x1b[1;3H") != null);
+}
+
+// ============================================================================
+// STREAM-AGNOSTIC / CALLBACK MODE TESTS
+// ============================================================================
+
+test "renderer - instance buffers allocated at init" {
+    const pool = gp.initGlobalPool(std.testing.allocator);
+    defer gp.deinitGlobalPool();
+
+    // Test stdout strategy
+    var renderer_stdout = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true },
+    );
+    defer renderer_stdout.destroy();
+
+    // Instance buffers are always allocated at init (unified architecture)
+    try std.testing.expect(renderer_stdout.instanceOutputA.len == renderer.OUTPUT_BUFFER_SIZE);
+    try std.testing.expect(renderer_stdout.instanceOutputB.len == renderer.OUTPUT_BUFFER_SIZE);
+
+    // Test callback strategy
+    var renderer_callback = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer renderer_callback.destroy();
+
+    // Instance buffers are always allocated at init regardless of strategy
+    try std.testing.expect(renderer_callback.instanceOutputA.len == renderer.OUTPUT_BUFFER_SIZE);
+    try std.testing.expect(renderer_callback.instanceOutputB.len == renderer.OUTPUT_BUFFER_SIZE);
+}
+
+test "renderer - callback mode per-renderer buffer isolation" {
+    const pool = gp.initGlobalPool(std.testing.allocator);
+    defer gp.deinitGlobalPool();
+
+    // Create two renderers in callback mode
+    var renderer1 = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer renderer1.destroy();
+
+    var renderer2 = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer renderer2.destroy();
+
+    // Get output buffer pointers for both
+    var ptrs1: renderer.OutputBufferPtrs = undefined;
+    var ptrs2: renderer.OutputBufferPtrs = undefined;
+    renderer1.getOutputBufferPtrs(&ptrs1);
+    renderer2.getOutputBufferPtrs(&ptrs2);
+
+    // Verify that the buffers are different (isolated)
+    try std.testing.expect(ptrs1.bufferA != ptrs2.bufferA);
+    try std.testing.expect(ptrs1.bufferB != ptrs2.bufferB);
+
+    // Verify capacity is correct
+    try std.testing.expectEqual(renderer.OUTPUT_BUFFER_SIZE, ptrs1.capacity);
+    try std.testing.expectEqual(renderer.OUTPUT_BUFFER_SIZE, ptrs2.capacity);
+}
+
+test "renderer - callback mode writeReady backpressure skips render" {
+    const pool = gp.initGlobalPool(std.testing.allocator);
+    defer gp.deinitGlobalPool();
+
+    var cli_renderer = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer cli_renderer.destroy();
+
+    // Initially writeReady is true (callback strategy starts ready)
+    try std.testing.expect(cli_renderer.getWriteReady());
+
+    // Render once - this should work and set writeReady to false
+    // (since no global flushCallback is set, writeReady stays true in test, so we manually set it)
+    const initialFrameCount = cli_renderer.renderStats.frameCount;
+    cli_renderer.render(false);
+    try std.testing.expectEqual(initialFrameCount + 1, cli_renderer.renderStats.frameCount);
+
+    // Now set writeReady to false (simulating backpressure)
+    cli_renderer.setWriteReady(false);
+    try std.testing.expect(!cli_renderer.getWriteReady());
+
+    // Render should be skipped due to backpressure
+    const frameCountBeforeSkip = cli_renderer.renderStats.frameCount;
+    cli_renderer.render(false);
+    try std.testing.expectEqual(frameCountBeforeSkip, cli_renderer.renderStats.frameCount);
+
+    // Set writeReady back to true (backpressure cleared)
+    cli_renderer.setWriteReady(true);
+    try std.testing.expect(cli_renderer.getWriteReady());
+
+    // Now render should work again
+    cli_renderer.render(false);
+    try std.testing.expectEqual(frameCountBeforeSkip + 1, cli_renderer.renderStats.frameCount);
+}
+
+test "renderer - callback strategy prevents threading" {
+    const pool = gp.initGlobalPool(std.testing.allocator);
+    defer gp.deinitGlobalPool();
+
+    // Create renderer with callback strategy
+    var cli_renderer = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer cli_renderer.destroy();
+
+    // useThread should be false for callback strategy (JSCallback limitation)
+    try std.testing.expect(!cli_renderer.useThread);
+
+    // Trying to enable threading should be ignored for callback mode
+    cli_renderer.setUseThread(true);
+    try std.testing.expect(!cli_renderer.useThread);
+}
+
+test "renderer - multiple renderers in callback mode render independently" {
+    const pool = gp.initGlobalPool(std.testing.allocator);
+    defer gp.deinitGlobalPool();
+
+    var tb1 = try TextBuffer.init(std.testing.allocator, pool, .unicode);
+    defer tb1.deinit();
+    try tb1.setText("Renderer 1");
+
+    var view1 = try TextBufferView.init(std.testing.allocator, tb1);
+    defer view1.deinit();
+
+    var tb2 = try TextBuffer.init(std.testing.allocator, pool, .unicode);
+    defer tb2.deinit();
+    try tb2.setText("Renderer 2");
+
+    var view2 = try TextBufferView.init(std.testing.allocator, tb2);
+    defer view2.deinit();
+
+    var renderer1 = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer renderer1.destroy();
+
+    var renderer2 = try CliRenderer.create(
+        std.testing.allocator,
+        80,
+        24,
+        pool,
+        .{ .testing = true, .output_strategy = 1 },
+    );
+    defer renderer2.destroy();
+
+    // Draw different content to each
+    const buf1 = renderer1.getNextBuffer();
+    try buf1.drawTextBuffer(view1, 0, 0);
+
+    const buf2 = renderer2.getNextBuffer();
+    try buf2.drawTextBuffer(view2, 0, 0);
+
+    // Render both
+    renderer1.render(false);
+    renderer2.render(false);
+
+    // Verify both rendered (frame count incremented)
+    try std.testing.expectEqual(@as(u64, 1), renderer1.renderStats.frameCount);
+    try std.testing.expectEqual(@as(u64, 1), renderer2.renderStats.frameCount);
+
+    // Verify content is different in their buffers
+    const cell1 = renderer1.getCurrentBuffer().get(0, 0);
+    const cell2 = renderer2.getCurrentBuffer().get(0, 0);
+
+    try std.testing.expect(cell1 != null);
+    try std.testing.expect(cell2 != null);
+    try std.testing.expectEqual(@as(u32, 'R'), cell1.?.char);
+    try std.testing.expectEqual(@as(u32, 'R'), cell2.?.char);
+
+    // Check different characters to verify isolation (e.g., position 9)
+    const cell1_9 = renderer1.getCurrentBuffer().get(9, 0);
+    const cell2_9 = renderer2.getCurrentBuffer().get(9, 0);
+
+    try std.testing.expect(cell1_9 != null);
+    try std.testing.expect(cell2_9 != null);
+    // "Renderer 1" position 9 is '1', "Renderer 2" position 9 is '2'
+    try std.testing.expectEqual(@as(u32, '1'), cell1_9.?.char);
+    try std.testing.expectEqual(@as(u32, '2'), cell2_9.?.char);
 }

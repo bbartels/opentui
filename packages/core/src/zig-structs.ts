@@ -109,3 +109,10 @@ export const CursorStateStruct = defineStruct([
   ["b", "f32"],
   ["a", "f32"],
 ])
+
+// Stream-agnostic renderer output buffer pointers
+export const OutputBufferPtrsStruct = defineStruct([
+  ["bufferA", "pointer"],
+  ["bufferB", "pointer"],
+  ["capacity", "u64"],
+])

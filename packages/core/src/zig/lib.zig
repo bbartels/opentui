@@ -39,7 +39,10 @@ export fn getArenaAllocatedBytes() usize {
     return arena.queryCapacity();
 }
 
-export fn createRenderer(width: u32, height: u32, testing: bool, remote: bool) ?*renderer.CliRenderer {
+// Positional args rather than an extern struct: only 2 TS call sites and 5 params.
+// A struct-by-pointer approach would add a TS/Zig definition sync burden with no
+// compile-time guard against field drift. Reconsider if this grows past ~6 params.
+export fn createRenderer(width: u32, height: u32, testing: bool, outputStrategy: u8, remote: bool) ?*renderer.CliRenderer {
     if (width == 0 or height == 0) {
         logger.warn("Invalid renderer dimensions: {}x{}", .{ width, height });
         return null;
@@ -47,7 +50,11 @@ export fn createRenderer(width: u32, height: u32, testing: bool, remote: bool) ?
 
     const pool = gp.initGlobalPool(globalArena);
     _ = link.initGlobalLinkPool(globalArena);
-    return renderer.CliRenderer.createWithOptions(globalAllocator, width, height, pool, testing, remote) catch |err| {
+    return renderer.CliRenderer.create(globalAllocator, width, height, pool, .{
+        .testing = testing,
+        .output_strategy = outputStrategy,
+        .remote = remote,
+    }) catch |err| {
         logger.err("Failed to create renderer: {}", .{err});
         return null;
     };
@@ -574,6 +581,40 @@ export fn writeOut(rendererPtr: *renderer.CliRenderer, dataPtr: [*]const u8, dat
     if (dataLen == 0) return;
     const data = dataPtr[0..dataLen];
     rendererPtr.writeOut(data);
+}
+
+// =============================================================================
+// Callback output mode FFI exports
+// =============================================================================
+
+/// Register global flush callback for callback output mode.
+/// Called when a renderer in callback mode has output ready.
+/// Pass null to unregister and restore default stdout behavior.
+export fn setFlushCallback(callback: ?*const fn (
+    rendererPtr: *renderer.CliRenderer,
+    bufferIndex: u8,
+    bufferPtr: [*]const u8,
+    bufferLen: usize,
+) callconv(.c) void) void {
+    renderer.flushCallback = callback;
+}
+
+/// Get pointers to the per-renderer output buffers.
+/// TypeScript should call this once per renderer and create ArrayBuffer views.
+export fn getOutputBufferPtrs(rendererPtr: *renderer.CliRenderer, outPtr: *renderer.OutputBufferPtrs) void {
+    rendererPtr.getOutputBufferPtrs(outPtr);
+}
+
+/// Set the writeReady flag for backpressure control.
+/// When false, render() skips output generation for this renderer.
+/// TypeScript sets to false before async write, true after write completes.
+export fn setWriteReady(rendererPtr: *renderer.CliRenderer, ready: bool) void {
+    rendererPtr.setWriteReady(ready);
+}
+
+/// Get the output buffer capacity (constant, for TypeScript to know buffer size)
+export fn getOutputBufferCapacity() usize {
+    return renderer.OUTPUT_BUFFER_SIZE;
 }
 
 export fn createTextBuffer(widthMethod: u8) ?*text_buffer.UnifiedTextBuffer {

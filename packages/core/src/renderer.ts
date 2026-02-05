@@ -8,9 +8,78 @@ import {
   type WidthMethod,
 } from "./types"
 import { RGBA, parseColor, type ColorInput } from "./lib/RGBA"
-import type { Pointer } from "bun:ffi"
+import { type Pointer, toArrayBuffer } from "bun:ffi"
 import { OptimizedBuffer } from "./buffer"
 import { resolveRenderLib, type RenderLib } from "./zig"
+
+/**
+ * Global flush dispatcher for callback-mode renderers.
+ * Allows multiple concurrent renderers to share a single global flush callback.
+ * Each renderer registers its handler and buffer views; the dispatcher routes
+ * flush events by rendererPtr.
+ */
+interface FlushDispatcherEntry {
+  onFlush: (buffer: Uint8Array, done: () => void) => void
+  viewA: Uint8Array
+  viewB: Uint8Array
+  lib: RenderLib
+}
+
+const flushDispatcher = new Map<Pointer, FlushDispatcherEntry>()
+let flushCallbackRegistered = false
+
+function registerGlobalFlushCallback(lib: RenderLib): void {
+  if (flushCallbackRegistered) return
+  flushCallbackRegistered = true
+
+  lib.registerFlushCallback((rendererPtr: Pointer, bufferIndex: number, bufferLen: bigint | number) => {
+    const entry = flushDispatcher.get(rendererPtr)
+    const len = Number(bufferLen)
+
+    if (!entry || len === 0) {
+      // No handler for this renderer or empty buffer - signal ready immediately
+      lib.setWriteReady(rendererPtr, true)
+      return
+    }
+
+    const view = bufferIndex === 0 ? entry.viewA : entry.viewB
+    if (!view) {
+      entry.lib.setWriteReady(rendererPtr, true)
+      return
+    }
+
+    const slice = view.subarray(0, len)
+    try {
+      entry.onFlush(slice, () => {
+        // Re-fetch entry to handle pointer reuse after destroy/recreate
+        const currentEntry = flushDispatcher.get(rendererPtr)
+        if (currentEntry) {
+          currentEntry.lib.setWriteReady(rendererPtr, true)
+        }
+      })
+    } catch (error) {
+      console.error("[FlushDispatcher] Error in onFlush:", error)
+      const currentEntry = flushDispatcher.get(rendererPtr)
+      if (currentEntry) {
+        currentEntry.lib.setWriteReady(rendererPtr, true)
+      }
+    }
+  })
+}
+
+function registerFlushHandler(
+  rendererPtr: Pointer,
+  onFlush: (buffer: Uint8Array, done: () => void) => void,
+  viewA: Uint8Array,
+  viewB: Uint8Array,
+  lib: RenderLib,
+): void {
+  flushDispatcher.set(rendererPtr, { onFlush, viewA, viewB, lib })
+}
+
+function unregisterFlushHandler(rendererPtr: Pointer): void {
+  flushDispatcher.delete(rendererPtr)
+}
 import { TerminalConsole, type ConsoleOptions, capture } from "./console"
 import { MouseParser, type MouseEventType, type RawMouseEvent, type ScrollInfo } from "./lib/parse.mouse"
 import { Selection } from "./lib/selection"
@@ -102,7 +171,34 @@ export interface CliRendererConfig {
   openConsoleOnError?: boolean
   prependInputHandlers?: ((sequence: string) => boolean)[]
   onDestroy?: () => void
+
+  /**
+   * Output mode for the renderer.
+   * - "stdout" (default): Write directly to process.stdout
+   * - "callback": Deliver output via onFlush callback (for SSH, etc.)
+   *
+   * When "callback":
+   * - Skips process.stdin/stdout binding
+   * - Output is delivered via onFlush callback
+   * - Input must be injected via injectInput()
+   */
+  outputMode?: OutputMode
+
+  /**
+   * Callback for output delivery in "callback" mode.
+   * Called when the renderer has ANSI output ready.
+   * The buffer is a view into native memory - write it immediately or copy.
+   * Call the provided `done` callback when the write completes (for backpressure).
+   */
+  onFlush?: (buffer: Uint8Array, done: () => void) => void
 }
+
+/**
+ * Output mode for the renderer.
+ * - "stdout": Write directly to process.stdout (default)
+ * - "callback": Deliver output via onFlush callback
+ */
+export type OutputMode = "stdout" | "callback"
 
 export type PixelResolution = {
   width: number
@@ -264,7 +360,11 @@ export async function createCliRenderer(config: CliRendererConfig = {}): Promise
     config.experimental_splitHeight && config.experimental_splitHeight > 0 ? config.experimental_splitHeight : height
 
   const ziglib = resolveRenderLib()
-  const rendererPtr = ziglib.createRenderer(width, renderHeight, { remote: config.remote ?? false })
+  const outputStrategy = config.outputMode === "callback" ? 1 : 0
+  const rendererPtr = ziglib.createRenderer(width, renderHeight, {
+    outputStrategy,
+    remote: config.remote ?? false,
+  })
   if (!rendererPtr) {
     throw new Error("Failed to create renderer")
   }
@@ -438,6 +538,12 @@ export class CliRenderer extends EventEmitter implements RenderContext {
   private _debugInputs: Array<{ timestamp: string; sequence: string }> = []
   private _debugModeEnabled: boolean = env.OTUI_DEBUG
 
+  // Output mode fields
+  private _outputMode: OutputMode = "stdout"
+  private _onFlush?: (buffer: Uint8Array, done: () => void) => void
+  private _outputBufferViewA: Uint8Array | null = null
+  private _outputBufferViewB: Uint8Array | null = null
+
   private handleError: (error: Error) => void = ((error: Error) => {
     console.error(error)
 
@@ -557,8 +663,19 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       this.stdout.write = this.interceptStdoutWrite.bind(this)
     }
 
-    // Handle terminal resize
-    process.on("SIGWINCH", this.sigwinchHandler)
+    // Output mode setup (must be before SIGWINCH binding)
+    this._outputMode = config.outputMode ?? "stdout"
+    this._onFlush = config.onFlush
+
+    if (this._outputMode === "callback" && !this._onFlush) {
+      this.lib.destroyRenderer(this.rendererPtr)
+      throw new Error('outputMode "callback" requires onFlush')
+    }
+
+    // Handle terminal resize (skip in callback mode - resize comes via handleResize())
+    if (this._outputMode === "stdout") {
+      process.on("SIGWINCH", this.sigwinchHandler)
+    }
 
     process.on("warning", this.warningHandler)
 
@@ -586,6 +703,11 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     this.useConsole = config.useConsole ?? true
     this._openConsoleOnError = config.openConsoleOnError ?? process.env.NODE_ENV !== "production"
     this._onDestroy = config.onDestroy
+
+    // Initialize callback mode if enabled (variables set earlier before SIGWINCH)
+    if (this._outputMode === "callback") {
+      this.initCallbackMode()
+    }
 
     global.requestAnimationFrame = (callback: FrameRequestCallback) => {
       const id = CliRenderer.animationFrameId++
@@ -1082,6 +1204,28 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       return this._keyHandler.processInput(sequence)
     })
 
+    // Skip stdin setup in callback mode
+    if (this._outputMode === "callback") {
+      this._stdinBuffer.on("data", (sequence: string) => {
+        if (this._debugModeEnabled) {
+          this._debugInputs.push({
+            timestamp: new Date().toISOString(),
+            sequence,
+          })
+        }
+
+        for (const handler of this.inputHandlers) {
+          if (handler(sequence)) {
+            return
+          }
+        }
+      })
+      this._stdinBuffer.on("paste", (data: string) => {
+        this._keyHandler.processPaste(data)
+      })
+      return
+    }
+
     if (this.stdin.setRawMode) {
       this.stdin.setRawMode(true)
     }
@@ -1128,6 +1272,47 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     }
 
     return event
+  }
+
+  /**
+   * Initialize callback output mode.
+   * Sets up the native callback and creates buffer views.
+   * Uses the global flush dispatcher to support multiple concurrent renderers.
+   * Note: Output strategy is set at renderer creation time via createRenderer.
+   */
+  private initCallbackMode(): void {
+    // Get buffer pointers and create views (once, per kommander's optimization)
+    const bufferPtrs = this.lib.getOutputBufferPtrs(this.rendererPtr)
+    if (bufferPtrs.capacity > 0) {
+      this._outputBufferViewA = new Uint8Array(toArrayBuffer(bufferPtrs.bufferA, 0, Number(bufferPtrs.capacity)))
+      this._outputBufferViewB = new Uint8Array(toArrayBuffer(bufferPtrs.bufferB, 0, Number(bufferPtrs.capacity)))
+    }
+
+    // Register the global flush callback (only once across all renderers)
+    registerGlobalFlushCallback(this.lib)
+
+    // Register this renderer's flush handler in the dispatcher
+    if (this._onFlush && this._outputBufferViewA && this._outputBufferViewB) {
+      registerFlushHandler(this.rendererPtr, this._onFlush, this._outputBufferViewA, this._outputBufferViewB, this.lib)
+    }
+  }
+
+  /**
+   * Inject input data as if it came from stdin.
+   * Use this in callback mode to provide input from SSH or other streams.
+   */
+  public injectInput(data: Buffer | Uint8Array): void {
+    if (this._useMouse && this.handleMouseData(data as Buffer)) {
+      return
+    }
+    this._stdinBuffer.process(data as Buffer)
+  }
+
+  /**
+   * Get the current output mode.
+   */
+  public get outputMode(): OutputMode {
+    return this._outputMode
   }
 
   private handleMouseData(data: Buffer): boolean {
@@ -1445,6 +1630,15 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     this.requestRender()
   }
 
+  /**
+   * Programmatically resize the renderer to new dimensions.
+   * Use this for external resize events (e.g., SSH window-change).
+   * For terminal-driven resize, the renderer handles SIGWINCH automatically.
+   */
+  public resize(width: number, height: number): void {
+    this.processResize(width, height)
+  }
+
   public setBackgroundColor(color: ColorInput): void {
     const parsedColor = parseColor(color)
     this.lib.setBackgroundColor(this.rendererPtr, parsedColor as RGBA)
@@ -1720,7 +1914,10 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     this._destroyFinalized = true
     this._destroyPending = false
 
-    process.removeListener("SIGWINCH", this.sigwinchHandler)
+    // Only remove SIGWINCH if we registered it (not in callback mode)
+    if (this._outputMode === "stdout") {
+      process.removeListener("SIGWINCH", this.sigwinchHandler)
+    }
     process.removeListener("uncaughtException", this.handleError)
     process.removeListener("unhandledRejection", this.handleError)
     process.removeListener("warning", this.warningHandler)
@@ -1779,6 +1976,18 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       this.stdin.setRawMode(false)
     }
     this.stdin.removeListener("data", this.stdinListener)
+
+    // Unregister from global flush dispatcher before destroying native renderer
+    if (this._outputMode === "callback") {
+      // Prevent new callbacks from native code by setting writeReady=false
+      // This stops the native renderer from invoking the flush callback
+      this.lib.setWriteReady(this.rendererPtr, false)
+      // Unregister from dispatcher - any in-flight callbacks will see entry removed and skip setWriteReady
+      unregisterFlushHandler(this.rendererPtr)
+      // Null buffer views before native memory is freed
+      this._outputBufferViewA = null
+      this._outputBufferViewB = null
+    }
 
     this.lib.destroyRenderer(this.rendererPtr)
     rendererTracker.removeRenderer(this)

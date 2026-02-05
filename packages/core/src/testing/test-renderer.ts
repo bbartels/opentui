@@ -73,8 +73,7 @@ export async function createTestRenderer(options: TestRendererOptions): Promise<
       }
     },
     resize: (width: number, height: number) => {
-      //@ts-expect-error - this is a test renderer
-      renderer.processResize(width, height)
+      renderer.resize(width, height)
     },
   }
 }
