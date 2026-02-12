@@ -22,6 +22,7 @@ import { getObjectsInViewport } from "./lib/objects-in-viewport"
 import { KeyHandler, InternalKeyHandler } from "./lib/KeyHandler"
 import { StdinBuffer } from "./lib/stdin-buffer"
 import { env, registerEnvVar } from "./lib/env"
+import { createWin32StdinConsole, installWin32ProcessedInputGuard as installWin32Guard, type Win32ProcessedInputGuard } from "./lib/win32-console"
 import { getTreeSitterClient } from "./lib/tree-sitter"
 import {
   createTerminalPalette,
@@ -403,6 +404,8 @@ export class CliRenderer extends EventEmitter implements RenderContext {
   private _terminalWidth: number = 0
   private _terminalHeight: number = 0
   private _terminalIsSetup: boolean = false
+
+  private win32ProcessedInputGuard: Win32ProcessedInputGuard | null = null
 
   private realStdoutWrite: (chunk: any, encoding?: any, callback?: any) => boolean
   private captureCallback: () => void = () => {
@@ -999,6 +1002,7 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     this._terminalIsSetup = true
 
     this.lib.setupTerminal(this.rendererPtr, this._useAlternateScreen)
+    this.enforceWin32ProcessedInputGuardLater()
     this._capabilities = this.lib.getTerminalCapabilities(this.rendererPtr)
 
     if (this.debugOverlay.enabled) {
@@ -1116,6 +1120,9 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       this.stdin.setRawMode(true)
     }
 
+    this.installWin32ProcessedInputGuard()
+    this.enforceWin32ProcessedInputGuardLater()
+
     this.stdin.resume()
     this.stdin.setEncoding("utf8")
     this.stdin.on("data", this.stdinListener)
@@ -1136,6 +1143,31 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     })
     this._stdinBuffer.on("paste", (data: string) => {
       this._keyHandler.processPaste(data)
+    })
+  }
+
+  private installWin32ProcessedInputGuard(): void {
+    if (process.platform !== "win32") return
+    if (this.stdin !== process.stdin) return
+    if (!this.stdin.isTTY) return
+    if (this.win32ProcessedInputGuard) return
+
+    const console = createWin32StdinConsole()
+    if (!console) return
+    this.win32ProcessedInputGuard = installWin32Guard(console)
+  }
+
+  private uninstallWin32ProcessedInputGuard(): void {
+    if (!this.win32ProcessedInputGuard) return
+    this.win32ProcessedInputGuard.dispose()
+    this.win32ProcessedInputGuard = null
+  }
+
+  private enforceWin32ProcessedInputGuardLater(): void {
+    if (!this.win32ProcessedInputGuard) return
+    this.win32ProcessedInputGuard.enforce()
+    setImmediate(() => {
+      this.win32ProcessedInputGuard?.enforce()
     })
   }
 
@@ -1668,6 +1700,8 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     this.stdin.removeListener("data", this.stdinListener)
     this.lib.suspendRenderer(this.rendererPtr)
 
+    this.uninstallWin32ProcessedInputGuard()
+
     if (this.stdin.setRawMode) {
       this.stdin.setRawMode(false)
     }
@@ -1680,6 +1714,9 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       this.stdin.setRawMode(true)
     }
 
+    this.installWin32ProcessedInputGuard()
+    this.enforceWin32ProcessedInputGuardLater()
+
     this.stdin.resume()
     this.addExitListeners()
 
@@ -1690,6 +1727,7 @@ export class CliRenderer extends EventEmitter implements RenderContext {
     })
 
     this.lib.resumeRenderer(this.rendererPtr)
+    this.enforceWin32ProcessedInputGuardLater()
 
     if (this._suspendedMouseEnabled) {
       this.enableMouse()
@@ -1812,6 +1850,7 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       this.flushStdoutCache(this._splitHeight, true)
     }
 
+    this.uninstallWin32ProcessedInputGuard()
     if (this.stdin.setRawMode) {
       this.stdin.setRawMode(false)
     }
