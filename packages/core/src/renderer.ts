@@ -118,6 +118,7 @@ const KITTY_FLAG_EVENT_TYPES = 0b10 // Report event types (press/repeat/release)
 const KITTY_FLAG_ALTERNATE_KEYS = 0b100 // Report alternate keys (e.g., numpad vs regular)
 const KITTY_FLAG_ALL_KEYS_AS_ESCAPES = 0b1000 // Report all keys as escape codes
 const KITTY_FLAG_REPORT_TEXT = 0b10000 // Report text associated with key events
+const DENO_SUPPORTED_EXIT_SIGNALS: ReadonlySet<NodeJS.Signals> = new Set(["SIGINT", "SIGTERM", "SIGQUIT", "SIGHUP"])
 
 function isUnsupportedSignalError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -540,7 +541,7 @@ export class CliRenderer extends EventEmitter implements RenderContext {
 
     this.rendererPtr = rendererPtr
     this.exitOnCtrlC = config.exitOnCtrlC === undefined ? true : config.exitOnCtrlC
-    this.exitSignals = config.exitSignals || [
+    const configuredExitSignals = config.exitSignals || [
       "SIGINT", // Ctrl+C
       "SIGTERM", // Termination signal
       "SIGQUIT", // Ctrl+\
@@ -551,6 +552,10 @@ export class CliRenderer extends EventEmitter implements RenderContext {
       "SIGBUS", // Bus error
       "SIGFPE", // Floating point exception
     ]
+
+    this.exitSignals = isDenoRuntime()
+      ? configuredExitSignals.filter((signal) => DENO_SUPPORTED_EXIT_SIGNALS.has(signal))
+      : configuredExitSignals
 
     this.clipboard = new Clipboard(this.lib, this.rendererPtr)
     this.resizeDebounceDelay = config.debounceDelay || 100

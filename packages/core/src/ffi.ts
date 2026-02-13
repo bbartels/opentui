@@ -107,6 +107,7 @@ export function dlopen(
 
 function wrapDenoSymbols(nativeSymbols: Record<string, any>, symbols: CompatSymbolDefinitions): Record<string, any> {
   const wrapped: Record<string, any> = {}
+  const deno = getDenoFFI()
 
   for (const [name, nativeSymbol] of Object.entries(nativeSymbols)) {
     const definition = symbols[name]
@@ -132,6 +133,11 @@ function wrapDenoSymbols(nativeSymbols: Record<string, any>, symbols: CompatSymb
 
         if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
           convertedArgs[pointerIndex] = ptr(value)
+          continue
+        }
+
+        if (typeof value === "number" || typeof value === "bigint") {
+          convertedArgs[pointerIndex] = toDenoPointer(value, deno)
         }
       }
 
@@ -180,14 +186,25 @@ export function toArrayBuffer(pointer: Pointer, byteOffset = 0, byteLength?: num
   }
 
   const deno = getDenoFFI()
-  let targetPointer: number | bigint | object = pointer
+  let targetPointer: number | bigint | object = toDenoPointer(pointer, deno)
   if (byteOffset > 0 && deno.UnsafePointer.offset) {
-    targetPointer = deno.UnsafePointer.offset(pointer, byteOffset)
+    targetPointer = deno.UnsafePointer.offset(targetPointer, byteOffset)
   }
 
   const view = new deno.UnsafePointerView(targetPointer)
   const length = byteLength ?? 0
   return view.getArrayBuffer(length)
+}
+
+export function pointerFromAddress(address: number | bigint): Pointer {
+  const runtime = detectRuntime()
+
+  if (runtime === "bun") {
+    return typeof address === "bigint" ? Number(address) : address
+  }
+
+  const deno = getDenoFFI()
+  return toDenoPointer(address, deno)
 }
 
 function toPointer(value: number | bigint | object | null): Pointer {
@@ -340,6 +357,7 @@ function getDenoFFI(): {
   dlopen: (path: string, symbols: Record<string, any>) => { symbols: Record<string, any>; close: () => void }
   UnsafePointer: {
     of: (value: ArrayBufferView) => number | bigint | object | null
+    create?: (value: number | bigint) => number | bigint | object | null
     offset?: (pointer: number | bigint | object, offset: number) => number | bigint | object
     value?: (pointer: unknown) => number | bigint
   }
@@ -370,4 +388,20 @@ function toDenoBufferView(value: ArrayBuffer | ArrayBufferView): ArrayBufferView
   const view = new Uint8Array(value)
   denoArrayBufferViews.set(value, view)
   return view
+}
+
+function toDenoPointer(
+  pointer: number | bigint | object,
+  deno: ReturnType<typeof getDenoFFI>,
+): number | bigint | object {
+  if (typeof pointer !== "number" && typeof pointer !== "bigint") {
+    return pointer
+  }
+
+  const created = deno.UnsafePointer.create?.(pointer)
+  if (!created) {
+    throw new Error("Failed to create Deno pointer")
+  }
+
+  return created
 }

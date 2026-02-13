@@ -1,4 +1,4 @@
-import { dlopen, toArrayBuffer, JSCallback, ptr, type Pointer } from "./ffi"
+import { dlopen, toArrayBuffer, JSCallback, ptr, pointerFromAddress, type Pointer } from "./ffi"
 import { appendFileSync, existsSync, writeFileSync } from "node:fs"
 import { EventEmitter } from "node:events"
 import { type CursorStyle, type DebugOverlayCorner, type WidthMethod, type Highlight, type LineInfo } from "./types"
@@ -3578,7 +3578,7 @@ class FFIRenderLib implements RenderLib {
     const outPtrView = new BigUint64Array(outPtrBuffer)
     const outLenView = new BigUint64Array(outLenBuffer)
 
-    const resultPtr = Number(outPtrView[0]) as Pointer
+    const resultPtr = pointerFromAddress(outPtrView[0])
     const resultLen = Number(outLenView[0])
 
     if (resultLen === 0) {

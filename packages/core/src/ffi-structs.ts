@@ -259,6 +259,24 @@ export function defineStruct<T = any>(fields: FieldDef[], options: StructDefOpti
     const view = new DataView(buffer)
     const out: Record<string, unknown> = {}
 
+    const getLengthFieldValue = (fieldName: string | undefined): number => {
+      if (!fieldName) {
+        return 0
+      }
+
+      const existing = out[fieldName]
+      if (existing !== undefined) {
+        return Number(existing)
+      }
+
+      const field = byName.get(fieldName)
+      if (!field) {
+        return 0
+      }
+
+      return Number(readPrimitive(view, field.type, field.offset))
+    }
+
     for (const entry of layout) {
       let value: unknown
 
@@ -274,7 +292,7 @@ export function defineStruct<T = any>(fields: FieldDef[], options: StructDefOpti
         case "char_ptr": {
           const pointer = readPrimitive(view, "pointer", entry.offset) as number | bigint
           const lenField = entry.lengthOf ?? inferredLengthFieldFor.get(entry.name)
-          const len = lenField ? Number(out[lenField] ?? 0) : 0
+          const len = getLengthFieldValue(lenField)
           if (!pointer || len <= 0) {
             value = ""
           } else {
@@ -286,7 +304,7 @@ export function defineStruct<T = any>(fields: FieldDef[], options: StructDefOpti
         case "array": {
           const pointer = readPrimitive(view, "pointer", entry.offset) as number | bigint
           const lenField = entry.lengthOf ?? inferredLengthFieldFor.get(entry.name)
-          const len = lenField ? Number(out[lenField] ?? 0) : 0
+          const len = getLengthFieldValue(lenField)
           if (!pointer || len <= 0) {
             value = []
           } else {
