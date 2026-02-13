@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach, describe } from "bun:test"
+import { test, expect, beforeEach, afterEach, describe } from "#test-runtime"
 import { Renderable, type RenderableOptions } from "../Renderable"
 import { createTestRenderer, type TestRenderer } from "../testing/test-renderer"
 import type { RenderContext } from "../types"

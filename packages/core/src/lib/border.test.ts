@@ -1,4 +1,4 @@
-import { test, expect, describe, spyOn, afterEach } from "bun:test"
+import { test, expect, describe, spyOn, afterEach } from "#test-runtime"
 import { isValidBorderStyle, parseBorderStyle, type BorderStyle } from "./border"
 
 describe("isValidBorderStyle", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { OptimizedBuffer } from "./buffer"
 import { RGBA } from "./lib/RGBA"
 

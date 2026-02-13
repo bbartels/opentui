@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect } from "#test-runtime"
 import { parseKeypress, type ParseKeypressOptions } from "./parse.keypress"
 
 test("parseKeypress - Kitty keyboard protocol disabled by default", () => {

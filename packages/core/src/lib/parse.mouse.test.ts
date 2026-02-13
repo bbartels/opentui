@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach } from "#test-runtime"
 import { MouseParser, type RawMouseEvent } from "./parse.mouse"
 
 // Encode a basic/X10 mouse event: ESC [ M Cb Cx Cy

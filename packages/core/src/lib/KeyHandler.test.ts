@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect } from "#test-runtime"
 import { InternalKeyHandler, KeyEvent } from "./KeyHandler"
 import { createTestRenderer } from "../testing/test-renderer"
 

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "#test-runtime"
 import { createTestRenderer } from "../../testing/test-renderer"
 import { TextareaRenderable } from "../Textarea"
 import { LineNumberRenderable } from "../LineNumberRenderable"

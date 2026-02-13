@@ -1,5 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { EditBuffer } from "./edit-buffer"
+import { sleep } from "./runtime"
 
 describe("EditBuffer", () => {
   let buffer: EditBuffer
@@ -905,19 +906,19 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer1.setText("Buffer 1")
-      await Bun.sleep(10)
+      await sleep(10)
       const count1AfterSetText = count1
       testBuffer1.moveCursorRight()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(count1).toBeGreaterThan(count1AfterSetText)
       expect(count2).toBe(0)
 
       testBuffer2.setText("Buffer 2")
-      await Bun.sleep(10)
+      await sleep(10)
       const count2AfterSetText = count2
       testBuffer2.moveCursorRight()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(count1).toBe(count1AfterSetText + 1)
       expect(count2).toBeGreaterThan(count2AfterSetText)
@@ -958,7 +959,7 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello World")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(0)
       testBuffer.destroy()
@@ -973,11 +974,11 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
       const countAfterSetText = eventCount
 
       testBuffer.insertText(" World")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(countAfterSetText)
       testBuffer.destroy()
@@ -992,12 +993,12 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello World")
-      await Bun.sleep(10)
+      await sleep(10)
       const countAfterSetText = eventCount
 
       testBuffer.setCursorToLineCol(0, 5)
       testBuffer.deleteChar()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(countAfterSetText)
       testBuffer.destroy()
@@ -1012,12 +1013,12 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
       const countAfterSetText = eventCount
 
       testBuffer.setCursorToLineCol(0, 5)
       testBuffer.deleteCharBackward()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(countAfterSetText)
       testBuffer.destroy()
@@ -1032,12 +1033,12 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Line 1\nLine 2\nLine 3")
-      await Bun.sleep(10)
+      await sleep(10)
       const countAfterSetText = eventCount
 
       testBuffer.gotoLine(1)
       testBuffer.deleteLine()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(countAfterSetText)
       testBuffer.destroy()
@@ -1052,12 +1053,12 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
       const countAfterSetText = eventCount
 
       testBuffer.setCursorToLineCol(0, 5)
       testBuffer.newLine()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(countAfterSetText)
       testBuffer.destroy()
@@ -1077,7 +1078,7 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(count1).toBeGreaterThan(0)
       expect(count2).toBeGreaterThan(0)
@@ -1089,7 +1090,7 @@ describe("EditBuffer Events", () => {
     it("should support removing content-changed listeners", async () => {
       const testBuffer = EditBuffer.create("wcwidth")
       testBuffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
 
       let eventCount = 0
       const listener = () => {
@@ -1098,13 +1099,13 @@ describe("EditBuffer Events", () => {
 
       testBuffer.on("content-changed", listener)
       testBuffer.insertText(" World")
-      await Bun.sleep(10)
+      await sleep(10)
 
       const firstCount = eventCount
 
       testBuffer.off("content-changed", listener)
       testBuffer.insertText("!")
-      await Bun.sleep(10)
+      await sleep(10)
 
       // Count should not have increased after removing listener
       expect(eventCount).toBe(firstCount)
@@ -1127,21 +1128,21 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer1.setText("Buffer 1")
-      await Bun.sleep(10)
+      await sleep(10)
       const count1AfterSetText = count1
 
       testBuffer1.insertText(" updated")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(count1).toBeGreaterThan(count1AfterSetText)
       expect(count2).toBe(0)
 
       testBuffer2.setText("Buffer 2")
-      await Bun.sleep(10)
+      await sleep(10)
       const count2AfterSetText = count2
 
       testBuffer2.insertText(" updated")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(count1).toBe(count1AfterSetText + 1)
       expect(count2).toBeGreaterThan(count2AfterSetText)
@@ -1159,7 +1160,7 @@ describe("EditBuffer Events", () => {
       })
 
       testBuffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
 
       const countBeforeDestroy = eventCount
 
@@ -1399,7 +1400,7 @@ describe("EditBuffer History Management", () => {
       })
 
       buffer.setText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(0)
     })
@@ -1411,7 +1412,7 @@ describe("EditBuffer History Management", () => {
       })
 
       buffer.replaceText("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(0)
     })
@@ -1423,7 +1424,7 @@ describe("EditBuffer History Management", () => {
       })
 
       buffer.setTextOwned("Hello")
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(0)
     })
@@ -1551,11 +1552,11 @@ describe("EditBuffer Clear Method", () => {
       })
 
       buffer.setText("Hello World")
-      await Bun.sleep(10)
+      await sleep(10)
       const countAfterSetText = eventCount
 
       buffer.clear()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(eventCount).toBeGreaterThan(countAfterSetText)
     })
@@ -1568,11 +1569,11 @@ describe("EditBuffer Clear Method", () => {
 
       buffer.setText("Hello World")
       buffer.setCursorToLineCol(0, 5)
-      await Bun.sleep(10)
+      await sleep(10)
       const countBeforeClear = eventCount
 
       buffer.clear()
-      await Bun.sleep(10)
+      await sleep(10)
 
       // Should emit cursor-changed when resetting cursor to 0,0
       expect(eventCount).toBeGreaterThan(countBeforeClear)
@@ -1591,13 +1592,13 @@ describe("EditBuffer Clear Method", () => {
 
       buffer.setText("Hello World")
       buffer.setCursorToLineCol(0, 5)
-      await Bun.sleep(10)
+      await sleep(10)
 
       const contentCountBefore = contentChangedCount
       const cursorCountBefore = cursorChangedCount
 
       buffer.clear()
-      await Bun.sleep(10)
+      await sleep(10)
 
       expect(contentChangedCount).toBeGreaterThan(contentCountBefore)
       expect(cursorChangedCount).toBeGreaterThan(cursorCountBefore)

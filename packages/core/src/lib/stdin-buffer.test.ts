@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "bun:test"
+import { describe, expect, it, beforeEach } from "#test-runtime"
 import { StdinBuffer } from "./stdin-buffer"
 
 describe("StdinBuffer", () => {

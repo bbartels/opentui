@@ -1,9 +1,11 @@
-import { test, expect, beforeEach, beforeAll, afterAll, describe } from "bun:test"
+import { test, expect, beforeEach, beforeAll, afterAll, describe } from "#test-runtime"
 import { TreeSitterClient, addDefaultParsers } from "./client"
 import { tmpdir } from "os"
 import { join, resolve } from "path"
+import { fileURLToPath } from "node:url"
 import { mkdir, readdir, stat } from "fs/promises"
 import type { FiletypeParserOptions } from "./types"
+import { file, serve } from "../../runtime"
 
 describe("TreeSitterClient Caching", () => {
   let dataPath: string
@@ -12,13 +14,13 @@ describe("TreeSitterClient Caching", () => {
   const BASE_URL = `http://localhost:${TEST_PORT}`
 
   beforeAll(async () => {
-    const assetsDir = resolve(__dirname, "assets")
-    testServer = Bun.serve({
+    const assetsDir = resolve(fileURLToPath(new URL("./assets", import.meta.url).toString()))
+    testServer = serve({
       port: TEST_PORT,
       fetch(req) {
         const url = new URL(req.url)
         const filePath = join(assetsDir, url.pathname)
-        return new Response(Bun.file(filePath))
+        return new Response(file(filePath) as BodyInit)
       },
     })
   })

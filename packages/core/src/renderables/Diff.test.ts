@@ -1,9 +1,10 @@
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "#test-runtime"
 import { DiffRenderable } from "./Diff"
 import { SyntaxStyle } from "../syntax-style"
 import { RGBA } from "../lib/RGBA"
 import { createTestRenderer, type TestRenderer } from "../testing"
 import type { SimpleHighlight } from "../lib/tree-sitter/types"
+import { sleep } from "../runtime"
 
 let currentRenderer: TestRenderer
 let renderOnce: () => Promise<void>
@@ -659,7 +660,7 @@ test("DiffRenderable - stable rendering across multiple frames (no visual glitch
   currentRenderer.root.add(diffRenderable)
 
   // Wait for automatic initial render to happen
-  await Bun.sleep(50)
+  await sleep(50)
 
   const frameAfterAutoRender = captureFrame()
 
@@ -2805,22 +2806,22 @@ test("DiffRenderable - split view with word wrapping: changing diff content shou
   })
 
   parentContainer1.add(correctDiff)
-  await Bun.sleep(200)
+  await sleep(200)
 
   // Press V - toggle to split view
   correctDiff.view = "split"
-  await Bun.sleep(200)
+  await sleep(200)
 
   // Press W - toggle to word wrap
   correctDiff.wrapMode = "word"
-  await Bun.sleep(500)
+  await sleep(500)
 
   const correctFrame = captureFrame()
 
   // Clean up
   parentContainer1.destroyRecursively()
   renderer.root.remove("parent-container-1")
-  await Bun.sleep(100)
+  await sleep(100)
 
   // PART 2: BUGGY PATH
   // Start with calculatorDiff, view="unified", wrapMode="none"
@@ -2857,21 +2858,21 @@ test("DiffRenderable - split view with word wrapping: changing diff content shou
   })
 
   parentContainer2.add(buggyDiff)
-  await Bun.sleep(200)
+  await sleep(200)
 
   // Press V - toggle to split view
   buggyDiff.view = "split"
-  await Bun.sleep(200)
+  await sleep(200)
 
   // Press W - toggle to word wrap
   buggyDiff.wrapMode = "word"
-  await Bun.sleep(200)
+  await sleep(200)
 
   // Press C - change diff content to textDemoDiff
   // THIS IS WHERE THE BUG MANIFESTS - lineInfo is STALE
   buggyDiff.diff = textDemoDiff
   buggyDiff.filetype = "typescript"
-  await Bun.sleep(500)
+  await sleep(500)
 
   const buggyFrame = captureFrame()
 

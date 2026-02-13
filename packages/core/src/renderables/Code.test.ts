@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "#test-runtime"
 import { CodeRenderable } from "./Code"
 import { SyntaxStyle } from "../syntax-style"
 import { RGBA } from "../lib/RGBA"
@@ -6,6 +6,7 @@ import { createTestRenderer, type TestRenderer, MockTreeSitterClient, type MockM
 import { TreeSitterClient } from "../lib/tree-sitter"
 import type { SimpleHighlight } from "../lib/tree-sitter/types"
 import { BoxRenderable } from "./Box"
+import { sleep } from "../runtime"
 
 let currentRenderer: TestRenderer
 let renderOnce: () => Promise<void>
@@ -1109,14 +1110,14 @@ test("CodeRenderable - streaming mode with drawUnstyledText=false waits for new 
   currentRenderer.root.add(codeRenderable)
   currentRenderer.start()
 
-  await Bun.sleep(30)
+  await sleep(30)
 
   expect(codeRenderable.plainText).toBe("const initial = 'hello';")
 
   codeRenderable.content = "const updated = 'world';"
   expect(codeRenderable.plainText).toBe("const initial = 'hello';")
 
-  await Bun.sleep(30)
+  await sleep(30)
 
   expect(codeRenderable.plainText).toBe("const updated = 'world';")
 
@@ -2010,7 +2011,7 @@ test("CodeRenderable - streaming with drawUnstyledText=false falls back to unsty
   currentRenderer.root.add(codeRenderable)
   currentRenderer.start()
 
-  await Bun.sleep(30)
+  await sleep(30)
 
   mockClient.highlightOnce = async () => {
     throw new Error("Highlighting failed")
@@ -2018,7 +2019,7 @@ test("CodeRenderable - streaming with drawUnstyledText=false falls back to unsty
 
   codeRenderable.content = "const updated = 'world';"
 
-  await Bun.sleep(30)
+  await sleep(30)
 
   expect(codeRenderable.plainText).toBe("const updated = 'world';")
 

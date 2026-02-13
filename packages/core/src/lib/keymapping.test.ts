@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "#test-runtime"
 import {
   mergeKeyBindings,
   getKeyBindingKey,

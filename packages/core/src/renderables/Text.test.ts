@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { TextRenderable, type TextOptions } from "./Text"
 import { TextNodeRenderable } from "./TextNode"
 import { RGBA } from "../lib/RGBA"

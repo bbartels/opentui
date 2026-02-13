@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test"
+import { test, expect, describe } from "#test-runtime"
 import { getObjectsInViewport } from "./objects-in-viewport"
 import type { ViewportBounds } from "../types"
 

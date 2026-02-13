@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "#test-runtime"
 import { DiffRenderable } from "./Diff"
 import { SyntaxStyle } from "../syntax-style"
 import { RGBA } from "../lib/RGBA"
@@ -6,6 +6,7 @@ import { createTestRenderer, type TestRenderer } from "../testing"
 import { MockTreeSitterClient } from "../testing/mock-tree-sitter-client"
 import type { SimpleHighlight } from "../lib/tree-sitter/types"
 import { BoxRenderable } from "./Box"
+import { sleep } from "../runtime"
 
 let currentRenderer: TestRenderer
 let renderOnce: () => Promise<void>
@@ -84,7 +85,7 @@ test("DiffRenderable - no endless loop when concealing markdown formatting", asy
   diffRenderable.wrapMode = "word"
 
   await renderOnce()
-  await Bun.sleep(2000)
+  await sleep(2000)
 
   const stats = currentRenderer.getStats()
   expect(stats.frameCount).toBeLessThan(25)
@@ -154,7 +155,7 @@ test("DiffRenderable - line number alignment and gutter heights in split view wi
 
   diffRenderable.wrapMode = "word"
   await currentRenderer.idle()
-  await Bun.sleep(200)
+  await sleep(200)
   const splitWrapFrame = captureFrame()
 
   const diffChildren = diffRenderable.getChildren()
@@ -194,7 +195,7 @@ test("DiffRenderable - line number alignment and gutter heights in split view wi
   await renderOnce()
   diffRenderable.wrapMode = "word"
   await renderOnce()
-  await Bun.sleep(200) // Give time for highlight rebuild
+  await sleep(200) // Give time for highlight rebuild
   await renderOnce()
   const splitWrapFrame2 = captureFrame()
   const lines2 = splitWrapFrame2.split("\n")

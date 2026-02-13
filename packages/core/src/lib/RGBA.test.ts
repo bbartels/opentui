@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test"
+import { test, expect, describe } from "#test-runtime"
 import { RGBA, hexToRgb, rgbToHex, hsvToRgb, parseColor } from "./RGBA"
 
 describe("RGBA class", () => {

@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test"
+import { test, expect, describe } from "#test-runtime"
 import { createTestRenderer } from "../testing/test-renderer"
 import { EventEmitter } from "events"
 import { Buffer } from "node:buffer"

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach } from "#test-runtime"
 import { envRegistry, registerEnvVar, env, clearEnvCache } from "./env.ts"
 
 // Backup and restore registry to avoid interfering with module-level registrations

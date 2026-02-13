@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { TextBuffer } from "./text-buffer"
 import { StyledText, stringToStyledText } from "./lib/styled-text"
 import { RGBA } from "./lib/RGBA"

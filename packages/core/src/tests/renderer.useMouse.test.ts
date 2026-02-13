@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test"
+import { test, expect, describe } from "#test-runtime"
 import { createTestRenderer } from "../testing/test-renderer"
 
 // NOTE: These tests are not running the mouse activation sequences,

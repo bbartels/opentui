@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "#test-runtime"
 import { MarkdownRenderable } from "../Markdown"
 import { TextRenderable } from "../Text"
 import { SyntaxStyle } from "../../syntax-style"

@@ -1,10 +1,10 @@
-import { test, expect, beforeEach, afterEach, beforeAll, describe } from "bun:test"
+import { test, expect, beforeEach, afterEach, beforeAll, describe } from "#test-runtime"
 import { TreeSitterClient } from "./client"
 import { tmpdir } from "os"
 import { join } from "path"
 import { mkdir, writeFile, unlink } from "fs/promises"
 import { getDataPaths } from "../data-paths"
-import { getTreeSitterClient } from "."
+import { getTreeSitterClient } from "./index.ts"
 
 describe("TreeSitterClient", () => {
   let client: TreeSitterClient

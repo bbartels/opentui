@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach, describe } from "bun:test"
+import { test, expect, beforeEach, afterEach, describe } from "#test-runtime"
 import { createTestRenderer, type TestRenderer, type MockMouse, MockTreeSitterClient } from "../testing"
 import { ScrollBoxRenderable } from "../renderables/ScrollBox"
 import { BoxRenderable } from "../renderables/Box"
@@ -6,6 +6,7 @@ import { TextRenderable } from "../renderables/Text"
 import { CodeRenderable } from "../renderables/Code"
 import { LinearScrollAccel, MacOSScrollAccel, type ScrollAcceleration } from "../lib/scroll-acceleration"
 import { SyntaxStyle } from "../syntax-style"
+import { sleep } from "../runtime"
 
 // Test accelerator that returns a constant multiplier
 class ConstantScrollAccel implements ScrollAcceleration {
@@ -666,10 +667,10 @@ world
       scrollBox.add(wrapper)
     }
 
-    await Bun.sleep(20)
+    await sleep(20)
 
     mockTreeSitterClient.resolveAllHighlightOnce()
-    await Bun.sleep(20)
+    await sleep(20)
 
     await renderOnce()
 
@@ -783,7 +784,7 @@ world
     wrapper1.add(code1)
     scrollBox.add(wrapper1)
 
-    await Bun.sleep(10)
+    await sleep(10)
     await testRenderer.idle()
 
     scrollPositions.push(scrollBox.scrollTop)
@@ -798,7 +799,7 @@ function test() {
 }
 console.log(test())`
 
-    await Bun.sleep(10)
+    await sleep(10)
     await testRenderer.idle()
 
     scrollPositions.push(scrollBox.scrollTop)
@@ -819,7 +820,7 @@ console.log(test())`
     wrapper2.add(code2)
     scrollBox.add(wrapper2)
 
-    await Bun.sleep(10)
+    await sleep(10)
     await testRenderer.idle()
 
     scrollPositions.push(scrollBox.scrollTop)
@@ -836,7 +837,7 @@ function multiply(a, b) {
 const result = multiply(x, y)
 console.log('Result:', result)`
 
-    await Bun.sleep(10)
+    await sleep(10)
     await testRenderer.idle()
 
     scrollPositions.push(scrollBox.scrollTop)
@@ -857,7 +858,7 @@ console.log('Result:', result)`
     wrapper3.add(code3)
     scrollBox.add(wrapper3)
 
-    await Bun.sleep(10)
+    await sleep(10)
     await testRenderer.idle()
 
     scrollPositions.push(scrollBox.scrollTop)
@@ -890,7 +891,7 @@ console.log(processor.process())
 console.log(processor.filter(x => x > 2))
 console.log(processor.reduce((acc, val) => acc + val, 0))`
 
-    await Bun.sleep(10)
+    await sleep(10)
     await testRenderer.idle()
 
     scrollPositions.push(scrollBox.scrollTop)

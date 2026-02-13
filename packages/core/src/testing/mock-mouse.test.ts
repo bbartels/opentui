@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "#test-runtime"
 import { createMockMouse, MouseButtons } from "./mock-mouse"
 import { PassThrough } from "stream"
 

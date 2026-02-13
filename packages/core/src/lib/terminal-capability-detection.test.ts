@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test"
+import { test, expect, describe } from "#test-runtime"
 import { isCapabilityResponse, isPixelResolutionResponse, parsePixelResolution } from "./terminal-capability-detection"
 
 describe("isCapabilityResponse", () => {

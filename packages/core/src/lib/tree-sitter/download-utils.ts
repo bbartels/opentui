@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "fs/promises"
+import { mkdir, readFile, writeFile } from "fs/promises"
 import * as path from "path"
 
 export interface DownloadResult {
@@ -8,6 +8,17 @@ export interface DownloadResult {
 }
 
 export class DownloadUtils {
+  private static toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+    const copy = new Uint8Array(bytes.byteLength)
+    copy.set(bytes)
+    return copy.buffer
+  }
+
+  private static async readBinary(source: string): Promise<ArrayBuffer> {
+    const bytes = await readFile(source)
+    return this.toArrayBuffer(bytes)
+  }
+
   private static hashUrl(url: string): string {
     let hash = 0
     for (let i = 0; i < url.length; i++) {
@@ -45,7 +56,7 @@ export class DownloadUtils {
       await mkdir(path.dirname(cacheFile), { recursive: true })
 
       try {
-        const cachedContent = await Bun.file(cacheFile).arrayBuffer()
+        const cachedContent = await this.readBinary(cacheFile)
         if (cachedContent.byteLength > 0) {
           console.log(`Loaded from cache: ${cacheFile} (${source})`)
           return { content: cachedContent, filePath: cacheFile }
@@ -63,7 +74,7 @@ export class DownloadUtils {
         const content = await response.arrayBuffer()
 
         try {
-          await writeFile(cacheFile, Buffer.from(content))
+          await writeFile(cacheFile, new Uint8Array(content))
           console.log(`Cached: ${source}`)
         } catch (cacheError) {
           console.warn(`Failed to cache: ${cacheError}`)
@@ -76,7 +87,7 @@ export class DownloadUtils {
     } else {
       try {
         console.log(`Loading from local path: ${source}`)
-        const content = await Bun.file(source).arrayBuffer()
+        const content = await this.readBinary(source)
         return { content, filePath: source }
       } catch (error) {
         return { error: `Error loading from local path ${source}: ${error}` }
@@ -101,7 +112,7 @@ export class DownloadUtils {
         }
         const content = await response.arrayBuffer()
 
-        await writeFile(targetPath, Buffer.from(content))
+        await writeFile(targetPath, new Uint8Array(content))
         console.log(`Downloaded: ${source} -> ${targetPath}`)
 
         return { content, filePath: targetPath }
@@ -111,8 +122,8 @@ export class DownloadUtils {
     } else {
       try {
         console.log(`Copying from local path: ${source}`)
-        const content = await Bun.file(source).arrayBuffer()
-        await writeFile(targetPath, Buffer.from(content))
+        const content = await this.readBinary(source)
+        await writeFile(targetPath, new Uint8Array(content))
         return { content, filePath: targetPath }
       } catch (error) {
         return { error: `Error copying from local path ${source}: ${error}` }

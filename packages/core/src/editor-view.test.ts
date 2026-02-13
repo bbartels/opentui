@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { EditBuffer } from "./edit-buffer"
 import { EditorView } from "./editor-view"
 import { RGBA } from "./lib/RGBA"

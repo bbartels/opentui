@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, test } from "#test-runtime"
 import { normalizeSymbolsForRuntime, type CompatSymbolDefinitions } from "./ffi"
 
 test("normalizeSymbolsForRuntime maps shared symbol shape to bun ffi shape", () => {

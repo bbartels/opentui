@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect } from "#test-runtime"
 import { parseKeypress, nonAlphanumericKeys, type ParsedKey, type KeyEventType } from "./parse.keypress"
 import { Buffer } from "node:buffer"
 

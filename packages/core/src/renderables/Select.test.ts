@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach, describe } from "bun:test"
+import { test, expect, beforeEach, afterEach, describe } from "#test-runtime"
 import { SelectRenderable, type SelectRenderableOptions, SelectRenderableEvents, type SelectOption } from "./Select"
 import { createTestRenderer, type MockInput, type TestRenderer } from "../testing/test-renderer"
 import { KeyEvent } from "../lib/KeyHandler"

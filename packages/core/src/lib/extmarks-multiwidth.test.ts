@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "bun:test"
+import { describe, expect, it, afterEach } from "#test-runtime"
 import { TextareaRenderable } from "../renderables/Textarea"
 import { createTestRenderer, type TestRenderer, type MockInput } from "../testing/test-renderer"
 import { type ExtmarksController } from "./extmarks"

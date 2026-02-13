@@ -1,10 +1,11 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "#test-runtime"
 import { createTestRenderer } from "../../testing/test-renderer"
 import { TextBufferRenderable } from "../TextBufferRenderable"
 import { LineNumberRenderable } from "../LineNumberRenderable"
 import { BoxRenderable } from "../Box"
 import { TextareaRenderable } from "../Textarea"
 import { t, fg, bold, cyan } from "../../lib/styled-text"
+import { sleep } from "../../runtime"
 
 const initialContent = `Welcome to the TextareaRenderable Demo!
 
@@ -1107,9 +1108,9 @@ describe("LineNumberRenderable", () => {
     // Wait for render and highlighting
     await renderOnce()
     // Give highlighting time to complete (increased for CI)
-    await Bun.sleep(1000)
+    await sleep(1000)
     await renderOnce()
-    await Bun.sleep(100)
+    await sleep(100)
     await renderOnce()
 
     frame = captureCharFrame()
@@ -1160,7 +1161,7 @@ describe("LineNumberRenderable", () => {
 
     // First render
     await renderOnce()
-    await Bun.sleep(50)
+    await sleep(50)
     await renderOnce()
 
     let frame = captureCharFrame()
@@ -1174,7 +1175,7 @@ describe("LineNumberRenderable", () => {
     codeRenderable.content = "line 1\nline 2\nline 3\nline 4\nline 5"
 
     await renderOnce()
-    await Bun.sleep(50)
+    await sleep(50)
     await renderOnce()
 
     frame = captureCharFrame()
@@ -1234,7 +1235,7 @@ describe("LineNumberRenderable", () => {
     codeRenderable.filetype = "typescript"
 
     await renderOnce()
-    await Bun.sleep(100)
+    await sleep(100)
     await renderOnce()
 
     frame = captureCharFrame()

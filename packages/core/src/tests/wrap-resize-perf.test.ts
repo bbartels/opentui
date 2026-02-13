@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "#test-runtime"
 import { TextBuffer } from "../text-buffer"
 import { TextBufferView } from "../text-buffer-view"
 import { stringToStyledText } from "../lib/styled-text"

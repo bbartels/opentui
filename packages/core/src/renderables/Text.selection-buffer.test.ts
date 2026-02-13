@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { TextRenderable } from "./Text"
 import { RGBA } from "../lib/RGBA"
 import { createTestRenderer, type MockMouse, type TestRenderer } from "../testing/test-renderer"

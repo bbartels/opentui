@@ -1,4 +1,4 @@
-import { test, expect, describe, mock, beforeEach } from "bun:test"
+import { test, expect, describe, mock, beforeEach } from "#test-runtime"
 import { TerminalConsole, ConsolePosition } from "./console"
 import { MouseEvent } from "./renderer"
 

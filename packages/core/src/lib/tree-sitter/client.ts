@@ -13,9 +13,11 @@ import type {
 } from "./types"
 import { getParsers } from "./default-parsers"
 import { resolve, isAbsolute, parse } from "path"
+import { fileURLToPath } from "node:url"
 import { existsSync } from "fs"
 import { registerEnvVar, env } from "../env"
 import { isBunfsPath, normalizeBunfsPath } from "../bunfs"
+import { isDenoRuntime } from "../../runtime"
 
 registerEnvVar({
   name: "OTUI_TREE_SITTER_WORKER_PATH",
@@ -101,12 +103,12 @@ export class TreeSitterClient extends EventEmitter<TreeSitterClientEvents> {
       worker_path = this.options.workerPath
     } else {
       worker_path = new URL("./parser.worker.js", import.meta.url).href
-      if (!existsSync(resolve(import.meta.dirname, "parser.worker.js"))) {
+      if (!existsSync(fileURLToPath(new URL("./parser.worker.js", import.meta.url).toString()))) {
         worker_path = new URL("./parser.worker.ts", import.meta.url).href
       }
     }
 
-    this.worker = new Worker(worker_path)
+    this.worker = isDenoRuntime() ? new Worker(worker_path, { type: "module" }) : new Worker(worker_path)
 
     // @ts-ignore - onmessage exists
     this.worker.onmessage = this.handleWorkerMessage.bind(this)

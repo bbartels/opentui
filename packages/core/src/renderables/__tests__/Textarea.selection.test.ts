@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { createTestRenderer, type TestRenderer, type MockMouse, type MockInput } from "../../testing/test-renderer"
 import { createTextareaRenderable } from "./renderable-test-utils"
 import { RGBA } from "../../lib/RGBA"
 import { OptimizedBuffer } from "../../buffer"
 import { TextRenderable } from "../Text"
+import { sleep } from "../../runtime"
 
 let currentRenderer: TestRenderer
 let renderOnce: () => Promise<void>
@@ -1371,7 +1372,7 @@ describe("Textarea - Selection Tests", () => {
 
       // Scroll up with mouse wheel
       await currentMouse.scroll(editor.x, editor.y + 1, "up")
-      await Bun.sleep(100)
+      await sleep(100)
 
       const selectionAfter = editor.getSelection()
       const selectedTextAfter = editor.getSelectedText()

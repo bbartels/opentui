@@ -1,9 +1,10 @@
-import { test, expect, beforeEach, afterEach, describe, spyOn } from "bun:test"
+import { test, expect, beforeEach, afterEach, describe, spyOn } from "#test-runtime"
 import {
   Renderable,
   BaseRenderable,
   RootRenderable,
   RenderableEvents,
+  isRenderable,
   type BaseRenderableOptions,
   type RenderableOptions,
 } from "../Renderable"
@@ -118,7 +119,6 @@ describe("Renderable", () => {
   })
 
   test("isRenderable", () => {
-    const { isRenderable } = require("../Renderable")
     const renderable = new TestBaseRenderable({})
     expect(isRenderable(renderable)).toBe(true)
     expect(isRenderable({})).toBe(false)

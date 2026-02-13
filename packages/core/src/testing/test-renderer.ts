@@ -80,7 +80,7 @@ export async function createTestRenderer(options: TestRendererOptions): Promise<
 }
 
 async function setupTestRenderer(config: TestRendererOptions) {
-  const stdin = config.stdin || (new Readable({ read() {} }) as NodeJS.ReadStream)
+  const stdin = config.stdin || createMockStdin()
   const stdout = config.stdout || process.stdout
 
   const width = config.width || stdout.columns || 80
@@ -113,4 +113,16 @@ async function setupTestRenderer(config: TestRendererOptions) {
   // await renderer.setupTerminal()
 
   return renderer
+}
+
+function createMockStdin(): NodeJS.ReadStream {
+  const stdin = new Readable({ read() {} }) as NodeJS.ReadStream & {
+    setRawMode?: (mode: boolean) => NodeJS.ReadStream
+    isTTY?: boolean
+  }
+
+  stdin.isTTY = true
+  stdin.setRawMode = () => stdin
+
+  return stdin
 }

@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test"
+import { test, expect, describe, beforeEach, afterEach } from "#test-runtime"
 import {
   TabSelectRenderable,
   type TabSelectRenderableOptions,

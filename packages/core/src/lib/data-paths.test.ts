@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect } from "#test-runtime"
 import { DataPathsManager } from "./data-paths"
 
 test("DataPathsManager validates appName", () => {

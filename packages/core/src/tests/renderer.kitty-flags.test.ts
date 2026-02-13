@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect } from "#test-runtime"
 import { buildKittyKeyboardFlags } from "../renderer"
 
 // Kitty Keyboard Protocol progressive enhancement flags

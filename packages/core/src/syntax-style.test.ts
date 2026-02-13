@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { SyntaxStyle } from "./syntax-style"
 import { RGBA } from "./lib/RGBA"
 import type { StyleDefinition, ThemeTokenStyle } from "./syntax-style"

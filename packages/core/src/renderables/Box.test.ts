@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach, afterEach, spyOn } from "bun:test"
+import { test, expect, describe, beforeEach, afterEach, spyOn } from "#test-runtime"
 import { BoxRenderable, type BoxOptions } from "./Box"
 import { createTestRenderer, type TestRenderer } from "../testing/test-renderer"
 import type { BorderStyle } from "../lib/border"

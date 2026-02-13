@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test } from "#test-runtime"
 import { isBunfsPath, getBunfsRootPath } from "./bunfs"
 
 describe("bunfs", () => {

@@ -11,8 +11,9 @@ import type {
   InjectionMapping,
 } from "./types"
 import { DownloadUtils } from "./download-utils"
-import { isMainThread } from "worker_threads"
+import { isMainThread } from "node:worker_threads"
 import { isBunfsPath, normalizeBunfsPath } from "../bunfs"
+import { isDenoRuntime } from "../../runtime"
 
 const self = globalThis
 
@@ -88,9 +89,15 @@ class ParserWorker {
         await mkdir(path.join(this.tsDataPath, "languages"), { recursive: true })
         await mkdir(path.join(this.tsDataPath, "queries"), { recursive: true })
 
-        let { default: treeWasm } = await import("web-tree-sitter/tree-sitter.wasm" as string, {
-          with: { type: "wasm" },
-        })
+        let treeWasm: string
+        if (isDenoRuntime()) {
+          treeWasm = import.meta.resolve("web-tree-sitter/tree-sitter.wasm")
+        } else {
+          const wasmModule = await import("web-tree-sitter/tree-sitter.wasm" as string, {
+            with: { type: "wasm" },
+          })
+          treeWasm = (wasmModule as { default: string }).default
+        }
 
         if (isBunfsPath(treeWasm)) {
           treeWasm = normalizeBunfsPath(path.parse(treeWasm).base)

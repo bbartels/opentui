@@ -1,4 +1,4 @@
-import { expect, describe, it, beforeEach, afterEach } from "bun:test"
+import { expect, describe, it, beforeEach, afterEach } from "#test-runtime"
 import { createTimeline, Timeline, type JSAnimation, engine, type EasingFunctions } from "./Timeline"
 
 describe("Timeline", () => {

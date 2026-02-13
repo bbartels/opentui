@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "#test-runtime"
 import { createTestRenderer, type TestRenderer } from "../testing/test-renderer"
 import { RendererControlState } from "../renderer"
 

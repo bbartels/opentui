@@ -1,4 +1,4 @@
-import { dlopen, toArrayBuffer, JSCallback, ptr, pointerFromAddress, type Pointer } from "./ffi"
+import { dlopen, toArrayBuffer, JSCallback, ptr, pointerFromAddress, pointerToBigInt, type Pointer } from "./ffi"
 import { appendFileSync, existsSync, writeFileSync } from "node:fs"
 import { EventEmitter } from "node:events"
 import { type CursorStyle, type DebugOverlayCorner, type WidthMethod, type Highlight, type LineInfo } from "./types"
@@ -75,6 +75,10 @@ let globalFFILogPath: string | null = null
 let exitHandlerRegistered = false
 
 function toPointer(value: Pointer): Pointer {
+  if (typeof value === "object") {
+    return pointerToBigInt(value)
+  }
+
   return value
 }
 
@@ -1846,7 +1850,7 @@ class FFIRenderLib implements RenderLib {
   private _nativeEvents: EventEmitter = new EventEmitter()
   private _anyEventHandlers: Array<(name: string, data: ArrayBuffer) => void> = []
   private nativeSpanFeedCallbackWrapper: JSCallback | null = null
-  private nativeSpanFeedHandlers = new Map<Pointer, NativeSpanFeedEventHandler>()
+  private nativeSpanFeedHandlers = new Map<bigint, NativeSpanFeedEventHandler>()
 
   constructor(libPath?: string) {
     this.opentui = getOpenTUILib(libPath)
@@ -1970,7 +1974,7 @@ class FFIRenderLib implements RenderLib {
 
     const callback = new JSCallback(
       (streamPtr: Pointer, eventId: number, arg0: Pointer, arg1: number | bigint) => {
-        const handler = this.nativeSpanFeedHandlers.get(toPointer(streamPtr))
+        const handler = this.nativeSpanFeedHandlers.get(pointerToBigInt(streamPtr))
         if (handler) {
           handler(eventId, arg0, arg1)
         }
@@ -3611,13 +3615,17 @@ class FFIRenderLib implements RenderLib {
 
   public registerNativeSpanFeedStream(stream: Pointer, handler: NativeSpanFeedEventHandler): void {
     const callback = this.ensureNativeSpanFeedCallback()
-    this.nativeSpanFeedHandlers.set(toPointer(stream), handler)
+    this.nativeSpanFeedHandlers.set(pointerToBigInt(stream), handler)
     this.opentui.symbols.streamSetCallback(stream, callback.ptr)
   }
 
   public unregisterNativeSpanFeedStream(stream: Pointer): void {
     this.opentui.symbols.streamSetCallback(stream, null)
-    this.nativeSpanFeedHandlers.delete(toPointer(stream))
+    this.nativeSpanFeedHandlers.delete(pointerToBigInt(stream))
+    if (this.nativeSpanFeedHandlers.size === 0 && this.nativeSpanFeedCallbackWrapper) {
+      this.nativeSpanFeedCallbackWrapper.close()
+      this.nativeSpanFeedCallbackWrapper = null
+    }
   }
 
   public createNativeSpanFeed(options?: NativeSpanFeedOptions | null): Pointer {
@@ -3635,7 +3643,11 @@ class FFIRenderLib implements RenderLib {
 
   public destroyNativeSpanFeed(stream: Pointer): void {
     this.opentui.symbols.destroyNativeSpanFeed(stream)
-    this.nativeSpanFeedHandlers.delete(toPointer(stream))
+    this.nativeSpanFeedHandlers.delete(pointerToBigInt(stream))
+    if (this.nativeSpanFeedHandlers.size === 0 && this.nativeSpanFeedCallbackWrapper) {
+      this.nativeSpanFeedCallbackWrapper.close()
+      this.nativeSpanFeedCallbackWrapper = null
+    }
   }
 
   public streamWrite(stream: Pointer, data: Uint8Array | string): number {

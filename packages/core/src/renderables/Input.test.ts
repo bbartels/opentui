@@ -1,4 +1,4 @@
-import { describe, expect, it, afterAll, beforeAll } from "bun:test"
+import { describe, expect, it, afterAll, beforeAll } from "#test-runtime"
 import { InputRenderable, type InputRenderableOptions, InputRenderableEvents } from "./Input"
 import { createTestRenderer } from "../testing/test-renderer"
 import type { KeyEvent } from "../lib/KeyHandler"

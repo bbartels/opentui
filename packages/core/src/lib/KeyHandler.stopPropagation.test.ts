@@ -1,4 +1,4 @@
-import { test, expect, beforeEach } from "bun:test"
+import { test, expect, beforeEach } from "#test-runtime"
 import { InternalKeyHandler, KeyEvent } from "./KeyHandler"
 
 function createKeyHandler(useKittyKeyboard: boolean = false): InternalKeyHandler {

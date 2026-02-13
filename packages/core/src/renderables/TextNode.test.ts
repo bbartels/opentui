@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "#test-runtime"
 import { TextNodeRenderable, isTextNodeRenderable } from "./TextNode"
 import { RGBA } from "../lib/RGBA"
 import { StyledText, red, bold, t } from "../lib/styled-text"

@@ -1,4 +1,4 @@
-import { describe, expect, it, afterAll, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, afterAll, beforeEach, afterEach } from "#test-runtime"
 import { createTestRenderer, type TestRenderer, type MockMouse, type MockInput } from "../../testing/test-renderer"
 import { createTextareaRenderable } from "./renderable-test-utils"
 import { KeyEvent } from "../../lib/KeyHandler"

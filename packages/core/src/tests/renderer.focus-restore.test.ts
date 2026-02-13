@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach, describe, spyOn } from "bun:test"
+import { test, expect, beforeEach, afterEach, describe, spyOn } from "#test-runtime"
 import { Buffer } from "node:buffer"
 import { createTestRenderer, type TestRenderer, type MockInput, type MockMouse } from "../testing/test-renderer"
 import { Renderable } from "../Renderable"

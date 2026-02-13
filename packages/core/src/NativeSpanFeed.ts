@@ -1,4 +1,4 @@
-import { pointerToBigInt, toArrayBuffer, type Pointer } from "./ffi"
+import { pointerFromAddress, pointerToBigInt, toArrayBuffer, type Pointer } from "./ffi"
 import { resolveRenderLib } from "./zig"
 import { SpanInfoStruct } from "./zig-structs"
 import type { GrowthPolicy, NativeSpanFeedOptions, NativeSpanFeedStats } from "./zig-structs"
@@ -71,8 +71,8 @@ export class NativeSpanFeed {
   readonly streamPtr: Pointer
   private readonly lib = resolveRenderLib()
   private readonly eventHandler: StreamEventHandler
-  private chunkMap = new Map<Pointer, ArrayBuffer>()
-  private chunkSizes = new Map<Pointer, number>()
+  private chunkMap = new Map<bigint, ArrayBuffer>()
+  private chunkSizes = new Map<bigint, number>()
   private dataHandlers = new Set<DataHandler>()
   private errorHandlers = new Set<(code: number) => void>()
   private drainBuffer: Uint8Array | null = null
@@ -191,11 +191,12 @@ export class NativeSpanFeed {
         case EventId.ChunkAdded: {
           const chunkLen = toNumber(arg1)
           if (chunkLen > 0 && arg0) {
-            if (!this.chunkMap.has(arg0)) {
+            const chunkKey = pointerToBigInt(arg0)
+            if (!this.chunkMap.has(chunkKey)) {
               const buffer = toArrayBuffer(arg0, 0, chunkLen)
-              this.chunkMap.set(arg0, buffer)
+              this.chunkMap.set(chunkKey, buffer)
             }
-            this.chunkSizes.set(arg0, chunkLen)
+            this.chunkSizes.set(chunkKey, chunkLen)
           }
           break
         }
@@ -239,12 +240,13 @@ export class NativeSpanFeed {
       for (const span of spans) {
         if (span.len === 0) continue
 
-        let buffer = this.chunkMap.get(span.chunkPtr)
+        const chunkKey = pointerToBigInt(span.chunkPtr)
+        let buffer = this.chunkMap.get(chunkKey)
         if (!buffer) {
-          const size = this.chunkSizes.get(span.chunkPtr)
+          const size = this.chunkSizes.get(chunkKey)
           if (!size) continue
-          buffer = toArrayBuffer(span.chunkPtr, 0, size)
-          this.chunkMap.set(span.chunkPtr, buffer)
+          buffer = toArrayBuffer(pointerFromAddress(chunkKey), 0, size)
+          this.chunkMap.set(chunkKey, buffer)
         }
 
         if (span.offset + span.len > buffer.byteLength) continue

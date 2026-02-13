@@ -1,4 +1,4 @@
-import { test, expect, beforeAll, afterAll, describe } from "bun:test"
+import { test, expect, beforeAll, afterAll, describe } from "#test-runtime"
 import { TreeSitterClient } from "./tree-sitter/client"
 import { treeSitterToStyledText, treeSitterToTextChunks } from "./tree-sitter-styled-text"
 import { SyntaxStyle } from "../syntax-style"

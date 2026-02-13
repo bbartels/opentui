@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "bun:test"
+import { describe, expect, it, afterEach } from "#test-runtime"
 import { createTestRenderer, type TestRenderer } from "../testing/test-renderer"
 import { ClipboardTarget, encodeOsc52Payload } from "./clipboard"
 import type { RenderLib } from "../zig"

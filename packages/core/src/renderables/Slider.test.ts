@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "#test-runtime"
 import { SliderRenderable, type SliderOptions } from "./Slider"
 import { createTestRenderer, type MockMouse, type TestRenderer } from "../testing/test-renderer"
 

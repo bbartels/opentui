@@ -1,11 +1,11 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
+import { describe, expect, it, beforeEach, afterEach } from "#test-runtime"
 import { createTestRenderer, type TestRenderer, type MockInput } from "../../testing/test-renderer"
 import { createTextareaRenderable } from "./renderable-test-utils"
 import { RGBA } from "../../lib/RGBA"
 import { SyntaxStyle } from "../../syntax-style"
 import { OptimizedBuffer } from "../../buffer"
 import { fg, t } from "../../lib"
-import { BoxRenderable, TextareaRenderable, TextRenderable } from ".."
+import { BoxRenderable, TextareaRenderable, TextRenderable } from "../index.ts"
 
 let currentRenderer: TestRenderer
 let renderOnce: () => Promise<void>

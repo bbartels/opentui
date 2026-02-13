@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect } from "#test-runtime"
 import { TerminalPalette } from "./terminal-palette"
 import { EventEmitter } from "events"
 import { Buffer } from "node:buffer"
