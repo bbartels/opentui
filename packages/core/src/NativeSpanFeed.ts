@@ -1,4 +1,4 @@
-import { toArrayBuffer, type Pointer } from "./ffi"
+import { pointerToBigInt, toArrayBuffer, type Pointer } from "./ffi"
 import { resolveRenderLib } from "./zig"
 import { SpanInfoStruct } from "./zig-structs"
 import type { GrowthPolicy, NativeSpanFeedOptions, NativeSpanFeedStats } from "./zig-structs"
@@ -200,7 +200,7 @@ export class NativeSpanFeed {
           break
         }
         case EventId.Error: {
-          const code = arg0
+          const code = Number(pointerToBigInt(arg0))
           for (const handler of this.errorHandlers) handler(code)
           break
         }
@@ -218,7 +218,7 @@ export class NativeSpanFeed {
 
   private decrementRefcount(chunkIndex: number): void {
     if (this.stateBuffer && chunkIndex < this.stateBuffer.length) {
-      const prev = this.stateBuffer[chunkIndex]
+      const prev = this.stateBuffer[chunkIndex] ?? 0
       this.stateBuffer[chunkIndex] = prev > 0 ? prev - 1 : 0
     }
   }
