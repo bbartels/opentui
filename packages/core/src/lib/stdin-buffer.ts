@@ -188,6 +188,23 @@ function isNestedEscapeSequenceStart(char: string | undefined): boolean {
 }
 
 /**
+ * Check if the buffer contains a partial escape sequence that should be
+ * discarded rather than emitted as text input on timeout.
+ *
+ * When data arrives fragmented over SSH, the timeout can fire mid-sequence.
+ * OSC/DCS/APC sequences are never valid keypresses, so partial ones should
+ * be dropped instead of leaking into the input field as garbage text.
+ *
+ * CSI and SS3 are NOT dropped here because a lone ESC followed by `[` or `O`
+ * can be a valid Alt+[ or Alt+O keypress that simply timed out.
+ */
+function isPartialEscapeSequence(data: string): boolean {
+  if (!data.startsWith(ESC) || data.length < 2) return false
+  const second = data[1]
+  return second === "]" || second === "P" || second === "_"
+}
+
+/**
  * Split accumulated buffer into complete sequences
  */
 function extractCompleteSequences(buffer: string): { sequences: string[]; remainder: string } {
@@ -379,6 +396,14 @@ export class StdinBuffer extends EventEmitter<StdinBufferEventMap> {
     }
 
     if (this.buffer.length === 0) {
+      return []
+    }
+
+    // Discard partial OSC/DCS/APC sequences that timed out mid-delivery.
+    // These are never valid keypresses and would appear as garbage text
+    // (e.g. "eeee/eeee/eeee" from a fragmented OSC color response over SSH).
+    if (isPartialEscapeSequence(this.buffer)) {
+      this.buffer = ""
       return []
     }
 
