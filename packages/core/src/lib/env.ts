@@ -1,4 +1,5 @@
 import { singleton } from "./singleton.ts"
+import { getDenoEnvGet, getProcessEnv } from "../runtime"
 
 /**
  * Environment variable registry
@@ -63,8 +64,44 @@ function normalizeBoolean(value: string): boolean {
   return ["true", "1", "on", "yes"].includes(lowerValue)
 }
 
+function getEnvValue(name: string): string | undefined {
+  const procEnv = getProcessEnv()
+  if (procEnv) {
+    try {
+      return procEnv[name]
+    } catch (error) {
+      if (!isEnvPermissionError(error)) {
+        throw error
+      }
+    }
+  }
+
+  const denoEnvGet = getDenoEnvGet()
+  if (!denoEnvGet) {
+    return undefined
+  }
+
+  try {
+    return denoEnvGet(name)
+  } catch (error) {
+    if (isEnvPermissionError(error)) {
+      return undefined
+    }
+
+    throw error
+  }
+}
+
+function isEnvPermissionError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return error.name === "PermissionDenied" || error.message.includes("Requires env access")
+}
+
 function parseEnvValue(config: EnvVarConfig): string | boolean | number {
-  const envValue = process.env[config.name]
+  const envValue = getEnvValue(config.name)
 
   if (envValue === undefined && config.default !== undefined) {
     return config.default

@@ -1,6 +1,6 @@
-import { dlopen, toArrayBuffer, JSCallback, ptr, type Pointer } from "bun:ffi"
-import { existsSync } from "fs"
-import { EventEmitter } from "events"
+import { dlopen, toArrayBuffer, JSCallback, ptr, type Pointer } from "./ffi"
+import { appendFileSync, existsSync, writeFileSync } from "node:fs"
+import { EventEmitter } from "node:events"
 import { type CursorStyle, type DebugOverlayCorner, type WidthMethod, type Highlight, type LineInfo } from "./types"
 export type { LineInfo }
 
@@ -25,17 +25,9 @@ import {
 import type { NativeSpanFeedOptions, NativeSpanFeedStats, ReserveInfo } from "./zig-structs"
 import { isBunfsPath } from "./lib/bunfs"
 import { attributesWithLink } from "./utils"
+import { detectFfiRuntime, getProcessOn, getRuntimePlatformArch } from "./runtime"
 
-const module = await import(`@opentui/core-${process.platform}-${process.arch}/index.ts`)
-let targetLibPath = module.default
-
-if (isBunfsPath(targetLibPath)) {
-  targetLibPath = targetLibPath.replace("../", "")
-}
-
-if (!existsSync(targetLibPath)) {
-  throw new Error(`opentui is not supported on the current platform: ${process.platform}-${process.arch}`)
-}
+let targetLibPath = await resolveDefaultLibPath()
 
 registerEnvVar({
   name: "OTUI_DEBUG_FFI",
@@ -79,7 +71,7 @@ registerEnvVar({
 
 // Global singleton state for FFI tracing to prevent duplicate exit handlers
 let globalTraceSymbols: Record<string, number[]> | null = null
-let globalFFILogWriter: ReturnType<ReturnType<typeof Bun.file>["writer"]> | null = null
+let globalFFILogPath: string | null = null
 let exitHandlerRegistered = false
 
 function toPointer(value: number | bigint): Pointer {
@@ -98,6 +90,12 @@ function toNumber(value: number | bigint): number {
 
 function getOpenTUILib(libPath?: string) {
   const resolvedLibPath = libPath || targetLibPath
+  if (!resolvedLibPath) {
+    const { platform, arch } = getRuntimePlatformArch()
+    throw new Error(
+      `No OpenTUI native library path resolved for ${platform}-${arch}. Call setRenderLibPath(path) or install @opentui/core-${platform}-${arch}.`,
+    )
+  }
 
   const rawSymbols = dlopen(resolvedLibPath, {
     // Logging
@@ -1096,6 +1094,68 @@ function getOpenTUILib(libPath?: string) {
   return rawSymbols
 }
 
+async function resolveDefaultLibPath(): Promise<string | undefined> {
+  const { platform, arch } = getRuntimePlatformArch()
+  const runtime = detectFfiRuntime()
+  const packageName = `@opentui/core-${platform}-${arch}`
+  const localLibraryPath = new URL(
+    `../node_modules/${packageName}/${getNativeLibraryFileName(platform)}`,
+    import.meta.url,
+  )
+  const localLibraryPathString = decodeURIComponent(localLibraryPath.pathname)
+  if (existsSync(localLibraryPathString)) {
+    return localLibraryPathString
+  }
+
+  const localPackageIndex = new URL(`../node_modules/${packageName}/index.ts`, import.meta.url)
+  const localPackageIndexPath = decodeURIComponent(localPackageIndex.pathname)
+  if (existsSync(localPackageIndexPath)) {
+    const localMod = await import(localPackageIndex.href)
+    const localCandidate = normalizeNativePath(localMod.default)
+    if (localCandidate && existsSync(localCandidate)) {
+      return localCandidate
+    }
+  }
+
+  const packageSpecifier = runtime === "deno" ? `npm:${packageName}` : `${packageName}/index.ts`
+
+  try {
+    const mod = await import(packageSpecifier)
+    const candidate = normalizeNativePath(mod.default)
+    if (candidate && existsSync(candidate)) {
+      return candidate
+    }
+  } catch (error) {
+    throw new Error(`Failed to import native package specifier: ${packageSpecifier}`, { cause: error })
+  }
+
+  return undefined
+}
+
+function getNativeLibraryFileName(platform: string): string {
+  if (platform === "darwin") {
+    return "libopentui.dylib"
+  }
+
+  if (platform === "windows" || platform === "win32") {
+    return "opentui.dll"
+  }
+
+  return "libopentui.so"
+}
+
+function normalizeNativePath(path: unknown): string | undefined {
+  if (typeof path !== "string" || path.length === 0) {
+    return undefined
+  }
+
+  if (isBunfsPath(path)) {
+    return path.replace("../", "")
+  }
+
+  return path
+}
+
 function convertToDebugSymbols<T extends Record<string, any>>(symbols: T): T {
   // Initialize global state on first call
   if (!globalTraceSymbols) {
@@ -1103,11 +1163,10 @@ function convertToDebugSymbols<T extends Record<string, any>>(symbols: T): T {
   }
 
   // Initialize global debug log writer on first call
-  if (env.OTUI_DEBUG_FFI && !globalFFILogWriter) {
+  if (env.OTUI_DEBUG_FFI && !globalFFILogPath) {
     const now = new Date()
     const timestamp = now.toISOString().replace(/[:.]/g, "-").replace(/T/, "_").split("Z")[0]
-    const logFilePath = `ffi_otui_debug_${timestamp}.log`
-    globalFFILogWriter = Bun.file(logFilePath).writer()
+    globalFFILogPath = `ffi_otui_debug_${timestamp}.log`
   }
 
   const debugSymbols: Record<string, any> = {}
@@ -1117,12 +1176,10 @@ function convertToDebugSymbols<T extends Record<string, any>>(symbols: T): T {
     debugSymbols[key] = value
   })
 
-  if (env.OTUI_DEBUG_FFI && globalFFILogWriter) {
-    const writer = globalFFILogWriter
+  if (env.OTUI_DEBUG_FFI && globalFFILogPath) {
+    const logPath = globalFFILogPath
     const writeSync = (msg: string) => {
-      const buffer = new TextEncoder().encode(msg + "\n")
-      writer.write(buffer)
-      writer.flush()
+      appendFileSync(logPath, msg + "\n")
     }
 
     Object.entries(symbols).forEach(([key, value]) => {
@@ -1162,10 +1219,15 @@ function convertToDebugSymbols<T extends Record<string, any>>(symbols: T): T {
   if ((env.OTUI_DEBUG_FFI || env.OTUI_TRACE_FFI) && !exitHandlerRegistered) {
     exitHandlerRegistered = true
 
-    process.on("exit", () => {
+    const processOn = getProcessOn()
+    if (!processOn) {
+      return debugSymbols as T
+    }
+
+    processOn("exit", () => {
       try {
-        if (globalFFILogWriter) {
-          globalFFILogWriter.end()
+        if (globalFFILogPath) {
+          globalFFILogPath = null
         }
       } catch (e) {
         // Ignore errors on exit
@@ -1290,7 +1352,7 @@ function convertToDebugSymbols<T extends Record<string, any>>(symbols: T): T {
           const now = new Date()
           const timestamp = now.toISOString().replace(/[:.]/g, "-").replace(/T/, "_").split("Z")[0]
           const traceFilePath = `ffi_otui_trace_${timestamp}.log`
-          Bun.write(traceFilePath, output)
+          writeFileSync(traceFilePath, output)
         } catch (e) {
           console.error("Failed to write FFI trace file:", e)
         }

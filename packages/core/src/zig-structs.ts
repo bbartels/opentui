@@ -1,5 +1,12 @@
-import { defineStruct, defineEnum } from "bun-ffi-structs"
-import { ptr, toArrayBuffer, type Pointer } from "bun:ffi"
+const ffiStructs = (globalThis as { Bun?: unknown }).Bun
+  ? await import("bun-ffi-structs")
+  : await import("./ffi-structs")
+
+const { defineStruct, defineEnum } = ffiStructs as {
+  defineStruct: any
+  defineEnum: any
+}
+import { ptr, toArrayBuffer, type Pointer } from "./ffi"
 import { RGBA } from "./lib/RGBA"
 
 const rgbaPackTransform = (rgba?: RGBA) => (rgba ? ptr(rgba.buffer) : null)
