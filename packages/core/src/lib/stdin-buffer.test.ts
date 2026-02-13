@@ -894,4 +894,124 @@ describe("StdinBuffer", () => {
       expect(emittedSequences).toEqual(["\x1bP>|kitty(0.40.1)\x1b\\"])
     })
   })
+
+  describe("OSC Sequence Handling (#6147)", () => {
+    it("should pass through complete OSC sequences", () => {
+      // Complete OSC with BEL terminator
+      processInput("\x1b]11;rgb:eeee/eeee/eeee\x07")
+      expect(emittedSequences).toEqual(["\x1b]11;rgb:eeee/eeee/eeee\x07"])
+    })
+
+    it("should pass through complete OSC sequences with ST terminator", () => {
+      processInput("\x1b]11;rgb:eeee/eeee/eeee\x1b\\")
+      expect(emittedSequences).toEqual(["\x1b]11;rgb:eeee/eeee/eeee\x1b\\"])
+    })
+
+    it("should reassemble split OSC sequence", () => {
+      processInput("\x1b]11;rgb:")
+      expect(emittedSequences).toEqual([])
+
+      processInput("eeee/eeee/eeee\x07")
+      expect(emittedSequences).toEqual(["\x1b]11;rgb:eeee/eeee/eeee\x07"])
+    })
+
+    it("should discard partial OSC sequence on timeout", async () => {
+      // Simulate fragmented OSC response where the terminator never arrives
+      processInput("\x1b]11;rgb:eeee/eeee/eeee")
+      expect(emittedSequences).toEqual([])
+
+      // Wait for timeout
+      await wait(15)
+
+      // Should NOT emit the partial OSC as text input
+      expect(emittedSequences).toEqual([])
+    })
+
+    it("should discard partial OSC sequence on explicit flush", () => {
+      processInput("\x1b]11;rgb:eeee/eeee/eeee")
+      const flushed = buffer.flush()
+
+      // Should NOT flush partial OSC as text input
+      expect(flushed).toEqual([])
+    })
+
+    it("should discard partial DCS sequence on timeout", async () => {
+      processInput("\x1bP>|kitty(0.40.1)")
+      expect(emittedSequences).toEqual([])
+
+      await wait(15)
+
+      // Should NOT emit partial DCS
+      expect(emittedSequences).toEqual([])
+    })
+
+    it("should discard partial DCS sequence on explicit flush", () => {
+      processInput("\x1bP>|kitty(0.40.1)")
+      const flushed = buffer.flush()
+      expect(flushed).toEqual([])
+    })
+
+    it("should discard partial APC sequence on timeout", async () => {
+      processInput("\x1b_Gi=1;OK")
+      expect(emittedSequences).toEqual([])
+
+      await wait(15)
+
+      expect(emittedSequences).toEqual([])
+    })
+
+    it("should discard partial APC sequence on explicit flush", () => {
+      processInput("\x1b_Gi=1;OK")
+      const flushed = buffer.flush()
+      expect(flushed).toEqual([])
+    })
+
+    it("should still flush partial CSI sequences (could be Alt+[)", () => {
+      processInput("\x1b[<35")
+      const flushed = buffer.flush()
+
+      // CSI partials should still flush — could be valid input
+      expect(flushed).toEqual(["\x1b[<35"])
+    })
+
+    it("should still flush lone ESC (could be Escape key)", () => {
+      processInput("\x1b")
+      const flushed = buffer.flush()
+      expect(flushed).toEqual(["\x1b"])
+    })
+
+    it("should handle multiple unsolicited OSC responses from Windows Terminal", async () => {
+      // OSC 10 (foreground) — arrives fragmented, times out
+      processInput("\x1b]10;rgb:ffff/ffff/ffff")
+      await wait(15)
+      expect(emittedSequences).toEqual([])
+
+      // OSC 11 (background) — arrives complete
+      processInput("\x1b]11;rgb:0000/0000/0000\x07")
+      expect(emittedSequences).toEqual(["\x1b]11;rgb:0000/0000/0000\x07"])
+    })
+
+    it("should handle OSC response arriving character by character then timing out", async () => {
+      processInput("\x1b")
+      processInput("]")
+      processInput("1")
+      processInput("1")
+      processInput(";")
+      // Connection stalls here — no more data
+      await wait(15)
+
+      // Partial OSC should be discarded, not emitted as "11;"
+      expect(emittedSequences).toEqual([])
+    })
+
+    it("should handle normal input after discarded partial OSC", async () => {
+      processInput("\x1b]11;rgb:eeee/eeee/eeee")
+      await wait(15)
+      expect(emittedSequences).toEqual([])
+
+      // Normal typing should work fine afterwards
+      processInput("hello")
+      expect(emittedSequences).toEqual(["h", "e", "l", "l", "o"])
+    })
+  })
 })
